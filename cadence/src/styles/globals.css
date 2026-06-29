@@ -1,0 +1,326 @@
+@import "tailwindcss";
+
+/* ─── Geist Font Variables ────────────────────────────────────── */
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ─── Design Tokens ─────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg: #FAF8F4;
+  --surface: #FFFFFF;
+  --surface-2: #F4F1EA;
+  --surface-3: #EDE8DD;
+
+  /* Borders */
+  --border: #ECE6D8;
+  --border-strong: #D8D1BF;
+
+  /* Typography */
+  --text: #1F1A14;
+  --text-muted: #6B6357;
+  --text-dim: #A39787;
+
+  /* Accent */
+  --accent: #4F46E5;
+  --accent-hover: #4338CA;
+  --accent-soft: #EEEDFB;
+  --accent-text: #3730A3;
+
+  /* Status: filled (scheduled/confirmed) */
+  --filled-bg: #E8F0E9;
+  --filled-text: #2F6841;
+  --filled-dot: #5A9B6E;
+  --filled-border: #C9DDC9;
+
+  /* Status: open (unassigned) */
+  --open-bg: #FAEFD8;
+  --open-text: #8A6017;
+  --open-dot: #D4A04A;
+  --open-border: #EAD8AC;
+
+  /* Status: conflict */
+  --conflict-bg: #F5E0DB;
+  --conflict-text: #9A3D34;
+  --conflict-dot: #C76054;
+  --conflict-border: #E8C5BD;
+
+  /* Status: draft */
+  --draft-bg: #EEE9DE;
+  --draft-text: #6B6357;
+  --draft-dot: #A39787;
+  --draft-border: #D8D1BF;
+
+  /* Status: pending */
+  --pending-bg: #E3E8F5;
+  --pending-text: #3D4D8A;
+  --pending-dot: #6373B5;
+  --pending-border: #C5CFE6;
+
+  /* Layout */
+  --row-h: 64px;
+  --shift-h: 52px;
+  --radius: 10px;
+  --radius-sm: 6px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(31, 26, 20, 0.04);
+  --shadow-md: 0 1px 3px rgba(31, 26, 20, 0.06), 0 6px 16px rgba(31, 26, 20, 0.04);
+  --shadow-lg: 0 4px 12px rgba(31, 26, 20, 0.08), 0 24px 64px rgba(31, 26, 20, 0.12);
+}
+
+/* ─── Dark Mode ──────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg: #16151A;
+  --surface: #1F1E24;
+  --surface-2: #27262E;
+  --surface-3: #32313A;
+  --border: #2E2D36;
+  --border-strong: #45444F;
+  --text: #F0EBE0;
+  --text-muted: #A39E94;
+  --text-dim: #6E6A62;
+  --accent: #8B85FF;
+  --accent-hover: #A09BFF;
+  --accent-soft: #2A2750;
+  --accent-text: #B8B3FF;
+
+  --filled-bg: #1B3023;
+  --filled-text: #8FC79E;
+  --filled-dot: #5A9B6E;
+  --filled-border: #29442F;
+
+  --open-bg: #36291A;
+  --open-text: #E5C68A;
+  --open-dot: #D4A04A;
+  --open-border: #4A3923;
+
+  --conflict-bg: #3A2421;
+  --conflict-text: #E5998E;
+  --conflict-dot: #C76054;
+  --conflict-border: #4E3029;
+
+  --draft-bg: #2A2820;
+  --draft-text: #A39E94;
+  --draft-dot: #6E6A62;
+  --draft-border: #3A382F;
+
+  --pending-bg: #1F2540;
+  --pending-text: #A8B3E5;
+  --pending-dot: #6373B5;
+  --pending-border: #2C3258;
+}
+
+/* ─── Density ────────────────────────────────────────────────────── */
+[data-density="compact"] {
+  --row-h: 44px;
+  --shift-h: 36px;
+}
+
+/* ─── Keyframes ──────────────────────────────────────────────────── */
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-from-left {
+  from { transform: translateX(-8px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ─── Animation Utilities ────────────────────────────────────────── */
+.animate-pulse-live {
+  animation: pulse-live 2s ease-in-out infinite;
+}
+
+.animate-drawer-in {
+  animation: drawer-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.18s ease-out forwards;
+}
+
+/* ─── Body Reset ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100%;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ─── Scrollbar Styles ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* ─── Focus Styles ───────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Selection ──────────────────────────────────────────────────── */
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+/* ─── Typography ─────────────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* ─── Form Elements ──────────────────────────────────────────────── */
+input, textarea, select {
+  background-color: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-dim);
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ─── Utility Classes ────────────────────────────────────────────── */
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.surface-2 {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-dim {
+  color: var(--text-dim);
+}
+
+/* ─── cmdk Command Palette ───────────────────────────────────────── */
+
+/* Group heading */
+[cmdk-group-heading] {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 10px 4px;
+}
+
+/* Items */
+[cmdk-item] {
+  border-radius: 8px;
+  transition: background 0.1s ease;
+}
+
+[cmdk-item][aria-selected="true"],
+[cmdk-item][data-selected="true"] {
+  background: var(--surface-2);
+  outline: none;
+}
+
+[cmdk-item]:active {
+  background: var(--surface-3);
+}
+
+/* Separator */
+[cmdk-separator] {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* Scrollbar inside Command.List */
+[cmdk-list]::-webkit-scrollbar {
+  width: 4px;
+}
+
+[cmdk-list]::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 2px;
+}
