@@ -81,8 +81,12 @@ export async function GET(request: NextRequest) {
     let bindIdx = 3;
 
     let sql = `
-      SELECT slh.EMPLOYEE_ID, slh.LOCATION_ID, slh.WORK_DATE, slh.SHIFT_NO,
-             slh.DAY_NAME, slh.START_TIME, slh.END_TIME, slh.HOURS_WORKED
+      SELECT slh.EMPLOYEE_ID, slh.LOCATION_ID,
+             TO_VARCHAR(slh.WORK_DATE, 'YYYY-MM-DD') AS WORK_DATE, slh.SHIFT_NO,
+             slh.DAY_NAME,
+             TO_VARCHAR(slh.START_TIME, 'HH24:MI') AS START_TIME,
+             TO_VARCHAR(slh.END_TIME, 'HH24:MI') AS END_TIME,
+             slh.HOURS_WORKED
       FROM ${SF_RAW}.STORE_MANUAL_LABOR_HOURS slh
       WHERE slh.WORK_DATE BETWEEN ? AND ?
     `;

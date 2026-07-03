@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getShifts } from '@/services/shifts.service';
 import { getEmployees } from '@/services/employees.service';
+import { useAuthStore } from '@/store/auth.store';
 import { getMonthGridDays, isInMonth, formatISODate, today } from '@/lib/date';
 import { netHours, formatMoney } from '@/lib/payroll';
 import { format } from 'date-fns';
@@ -20,19 +21,20 @@ interface MonthGridProps {
 export function MonthGrid({ anchorDate, departmentId, onSelectDay }: MonthGridProps) {
   const gridDays = useMemo(() => getMonthGridDays(anchorDate), [anchorDate]);
   const todayStr = today();
+  const locationId = useAuthStore((s) => s.user?.locationId);
 
   const dateFrom = formatISODate(gridDays[0]);
   const dateTo = formatISODate(gridDays[gridDays.length - 1]);
 
   const { data: shifts, isLoading: shiftsLoading, isError: shiftsError, error: shiftsErrorObj } = useQuery({
-    queryKey: ['shifts', dateFrom, dateTo, departmentId ?? null],
+    queryKey: ['shifts', dateFrom, dateTo, departmentId ?? null, locationId ?? null],
     queryFn: () =>
-      getShifts({ dateRange: { start: dateFrom, end: dateTo }, departmentId: departmentId ?? undefined }),
+      getShifts({ dateRange: { start: dateFrom, end: dateTo }, departmentId: departmentId ?? undefined, locationId }),
   });
 
   const { data: employees, isLoading: empLoading, isError: empError, error: empErrorObj } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => getEmployees(),
+    queryKey: ['employees', locationId ?? null],
+    queryFn: () => getEmployees({ locationId }),
   });
 
   const rateByEmployeeId = useMemo(

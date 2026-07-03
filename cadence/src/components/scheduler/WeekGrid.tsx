@@ -6,6 +6,7 @@ import { AlertTriangle, Plus } from 'lucide-react';
 import { getShifts } from '@/services/shifts.service';
 import { getEmployees, getRoleById } from '@/services/employees.service';
 import { useUIStore } from '@/store/ui.store';
+import { useAuthStore } from '@/store/auth.store';
 import { formatISODate, today } from '@/lib/date';
 import { netHours, formatMoney } from '@/lib/payroll';
 import { format } from 'date-fns';
@@ -306,6 +307,7 @@ export function WeekGrid({ days, departmentId }: WeekGridProps) {
   const setSelectedShiftId = useUIStore((s) => s.setSelectedShiftId);
   const setCreateShiftOpen = useUIStore((s) => s.setCreateShiftOpen);
   const setCreateShiftDefaults = useUIStore((s) => s.setCreateShiftDefaults);
+  const locationId = useAuthStore((s) => s.user?.locationId);
 
   const weekDays = days;
   const todayStr = today();
@@ -314,14 +316,14 @@ export function WeekGrid({ days, departmentId }: WeekGridProps) {
   const dateTo = formatISODate(weekDays[weekDays.length - 1]);
 
   const { data: shifts, isLoading: shiftsLoading, isError: shiftsError, error: shiftsErrorObj } = useQuery({
-    queryKey: ['shifts', dateFrom, dateTo, departmentId ?? null],
+    queryKey: ['shifts', dateFrom, dateTo, departmentId ?? null, locationId ?? null],
     queryFn: () =>
-      getShifts({ dateRange: { start: dateFrom, end: dateTo }, departmentId: departmentId ?? undefined }),
+      getShifts({ dateRange: { start: dateFrom, end: dateTo }, departmentId: departmentId ?? undefined, locationId }),
   });
 
   const { data: employees, isLoading: empLoading, isError: empError, error: empErrorObj } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => getEmployees(),
+    queryKey: ['employees', locationId ?? null],
+    queryFn: () => getEmployees({ locationId }),
   });
 
   // Build a map: employeeId → dateStr → Shift[]

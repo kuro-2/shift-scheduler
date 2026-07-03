@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@/store/ui.store';
+import { useAuthStore } from '@/store/auth.store';
 import { Avatar } from '@/components/common/Avatar';
 import { getEmployees, getLocations, getEmployeeById, ROLES, DEPARTMENTS } from '@/services/employees.service';
 import { createShift, updateShift, getShift } from '@/services/shifts.service';
@@ -83,6 +84,7 @@ export function CreateShiftDrawer() {
   const [submitting, setSubmitting] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  const sessionLocationId = useAuthStore((s) => s.user?.locationId);
   const { data: employees } = useQuery({ queryKey: ['employees'], queryFn: () => getEmployees() });
   const { data: locations } = useQuery({ queryKey: ['locations'], queryFn: () => getLocations() });
   const { data: editingShift } = useQuery({
@@ -91,10 +93,11 @@ export function CreateShiftDrawer() {
     enabled: !!editingShiftId,
   });
 
-  // Default location (create mode only) — derived at render time, no state needed
+  // Default location (create mode only) — prefer the logged-in user's own location
+  // so newly created shifts show up in their schedule view without an extra click
   const defaultLocationId =
     !isEditing && locations && locations.length > 0
-      ? (locations[0].locationId ?? locations[0].id)
+      ? (sessionLocationId ?? locations[0].locationId ?? locations[0].id)
       : '';
   const effectiveLocationId = form.locationId || defaultLocationId;
 
@@ -190,8 +193,13 @@ export function CreateShiftDrawer() {
   };
 
   const availableEmployees = useMemo(
-    () => (employees ?? []).filter((e) => !form.assignedPeople.some((p) => p.id === e.id)),
-    [employees, form.assignedPeople]
+    () =>
+      (employees ?? []).filter(
+        (e) =>
+          !form.assignedPeople.some((p) => p.id === e.id) &&
+          (!effectiveLocationId || e.locationIds.includes(effectiveLocationId))
+      ),
+    [employees, form.assignedPeople, effectiveLocationId]
   );
 
   async function handleSubmit(publish: boolean) {

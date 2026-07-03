@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { endOfYear, format } from 'date-fns';
 import { getShifts } from '@/services/shifts.service';
 import { getEmployees } from '@/services/employees.service';
+import { useAuthStore } from '@/store/auth.store';
 import { getYearMonths, getYearStart, formatISODate, today } from '@/lib/date';
 import { netHours, formatMoney } from '@/lib/payroll';
 import { ScheduleErrorState } from './ScheduleErrorState';
@@ -21,16 +22,17 @@ export function YearGrid({ anchorDate, departmentId, onSelectMonth }: YearGridPr
   const dateFrom = formatISODate(yearStart);
   const dateTo = formatISODate(endOfYear(yearStart));
   const currentMonthKey = today().slice(0, 7);
+  const locationId = useAuthStore((s) => s.user?.locationId);
 
   const { data: shifts, isLoading: shiftsLoading, isError: shiftsError, error: shiftsErrorObj } = useQuery({
-    queryKey: ['shifts', dateFrom, dateTo, departmentId ?? null],
+    queryKey: ['shifts', dateFrom, dateTo, departmentId ?? null, locationId ?? null],
     queryFn: () =>
-      getShifts({ dateRange: { start: dateFrom, end: dateTo }, departmentId: departmentId ?? undefined }),
+      getShifts({ dateRange: { start: dateFrom, end: dateTo }, departmentId: departmentId ?? undefined, locationId }),
   });
 
   const { data: employees, isLoading: empLoading, isError: empError, error: empErrorObj } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => getEmployees(),
+    queryKey: ['employees', locationId ?? null],
+    queryFn: () => getEmployees({ locationId }),
   });
 
   const rateByEmployeeId = useMemo(
