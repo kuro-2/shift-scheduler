@@ -16,6 +16,9 @@ import { EmployeeProfileDrawer } from '@/components/people/EmployeeProfileDrawer
 import { getEmployeeById } from '@/services/employees.service';
 import { CURRENT_EMPLOYEE_ID } from '@/components/mobile/current-employee';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { signOut } from '@/services/auth.service';
+import { useAuthStore } from '@/store/auth.store';
 
 interface MenuRow {
   id: string;
@@ -30,6 +33,17 @@ interface MenuRow {
 export default function MobileMorePage() {
   const [profileOpen, setProfileOpen] = useState(false);
   const employee = getEmployeeById(CURRENT_EMPLOYEE_ID);
+  const router = useRouter();
+  const clearAuth = useAuthStore((s) => s.clear);
+
+  async function handleSignOut() {
+    try {
+      await signOut();
+    } finally {
+      clearAuth();
+      router.push('/login');
+    }
+  }
 
   const rows: MenuRow[] = [
     { id: 'profile', label: 'My profile', Icon: User, onClick: () => setProfileOpen(true) },
@@ -47,7 +61,7 @@ export default function MobileMorePage() {
       onClick: () => toast.info('Help & support is coming soon — contact your manager for now'),
     },
     { id: 'theme', label: 'Theme', Icon: User, trailing: <ThemeToggle /> },
-    { id: 'sign-out', label: 'Sign out', Icon: LogOut, href: '/login', danger: true },
+    { id: 'sign-out', label: 'Sign out', Icon: LogOut, onClick: handleSignOut, danger: true },
   ];
 
   return (

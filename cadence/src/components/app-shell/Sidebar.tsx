@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useUIStore } from '@/store/ui.store';
+import { useAuthStore } from '@/store/auth.store';
+import { signOut } from '@/services/auth.service';
 
 // ─── Nav Config ──────────────────────────────────────────────────────────────
 
@@ -58,6 +60,18 @@ const WORKSPACE_ITEMS: NavItem[] = [
 const ADMIN_ITEMS: NavItem[] = [
   { id: 'settings', label: 'Settings', Icon: Settings, href: '/settings/company' },
 ];
+
+// ─── User display helpers ─────────────────────────────────────────────────────
+
+function getInitials(username: string): string {
+  const parts = username.split(/[.\s_-]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return username.slice(0, 2).toUpperCase();
+}
+
+function formatRole(role: string): string {
+  return role.charAt(0) + role.slice(1).toLowerCase();
+}
 
 // ─── Starburst SVG ────────────────────────────────────────────────────────────
 
@@ -176,9 +190,21 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const user = useAuthStore((s) => s.user);
+  const clearAuth = useAuthStore((s) => s.clear);
 
   const collapsed = !sidebarOpen;
   const width = collapsed ? 60 : 236;
+
+  async function handleLogout() {
+    setUserMenuOpen(false);
+    try {
+      await signOut();
+    } finally {
+      clearAuth();
+      router.push('/login');
+    }
+  }
 
   return (
     <aside
@@ -333,10 +359,7 @@ export function Sidebar() {
               {/* "My profile" (Settings) hidden while the app is scoped to the scheduler only */}
               <button
                 role="menuitem"
-                onClick={() => {
-                  setUserMenuOpen(false);
-                  router.push('/login');
-                }}
+                onClick={handleLogout}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -398,7 +421,7 @@ export function Sidebar() {
               flexShrink: 0,
             }}
           >
-            SK
+            {user ? getInitials(user.username) : '?'}
           </div>
 
           {/* Name + role */}
@@ -415,7 +438,7 @@ export function Sidebar() {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  Sarah Kim
+                  {user?.username ?? 'Guest'}
                 </div>
                 <div
                   style={{
@@ -426,7 +449,7 @@ export function Sidebar() {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  Operations Manager
+                  {user ? formatRole(user.userRole) : ''}
                 </div>
               </div>
               <ChevronDown size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
