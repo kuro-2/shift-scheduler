@@ -9,6 +9,7 @@ import { useUIStore } from '@/store/ui.store';
 import { useAuthStore } from '@/store/auth.store';
 import { formatISODate, today } from '@/lib/date';
 import { netHours, formatMoney } from '@/lib/payroll';
+import { getConflictingShiftIds } from '@/lib/conflicts';
 import { format } from 'date-fns';
 import { ScheduleErrorState } from './ScheduleErrorState';
 import type { Shift, ShiftStatus } from '@/types';
@@ -44,9 +45,9 @@ const STATUS_VARS = {
 
 // ─── Shift Card ───────────────────────────────────────────────────────────────
 
-function ShiftCard({ shift, onClick }: { shift: Shift; onClick: () => void }) {
+function ShiftCard({ shift, isConflict, onClick }: { shift: Shift; isConflict: boolean; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
-  const cfg = STATUS_VARS[shift.status as ShiftStatus] ?? STATUS_VARS.draft;
+  const cfg = isConflict ? STATUS_VARS.conflict : (STATUS_VARS[shift.status as ShiftStatus] ?? STATUS_VARS.draft);
   const role = getRoleById(shift.roleId);
 
   return (
@@ -93,7 +94,7 @@ function ShiftCard({ shift, onClick }: { shift: Shift; onClick: () => void }) {
         >
           {shift.startTime}–{shift.endTime}
         </span>
-        {shift.warning && (
+        {(shift.warning || isConflict) && (
           <AlertTriangle size={10} style={{ flexShrink: 0, opacity: 0.85 }} />
         )}
       </div>
@@ -370,19 +371,22 @@ export function WeekGrid({ days, departmentId }: WeekGridProps) {
     return map;
   }, [shifts, rateByEmployeeId]);
 
+  // Shifts that double-book the same employee on the same day (overlapping times)
+  const conflictShiftIds = useMemo(() => getConflictingShiftIds(shifts ?? []), [shifts]);
+
   // Status counts + total labor cost across the visible range (legend / summary bar)
   const { statusCounts, totalPayroll } = useMemo(() => {
     const counts: Record<ShiftStatus, number> = { filled: 0, open: 0, conflict: 0, draft: 0 };
     let payroll = 0;
     for (const shift of shifts ?? []) {
-      const status = (shift.status as ShiftStatus) ?? 'draft';
+      const status = conflictShiftIds.has(shift.id) ? 'conflict' : ((shift.status as ShiftStatus) ?? 'draft');
       counts[status] = (counts[status] ?? 0) + 1;
       if (shift.employeeId) {
         payroll += netHours(shift) * (rateByEmployeeId.get(shift.employeeId) ?? 0);
       }
     }
     return { statusCounts: counts, totalPayroll: payroll };
-  }, [shifts, rateByEmployeeId]);
+  }, [shifts, rateByEmployeeId, conflictShiftIds]);
 
   const isLoading = shiftsLoading || empLoading;
 
@@ -562,6 +566,7 @@ export function WeekGrid({ days, departmentId }: WeekGridProps) {
                             <ShiftCard
                               key={shift.id}
                               shift={shift}
+                              isConflict={conflictShiftIds.has(shift.id)}
                               onClick={() => setSelectedShiftId(shift.id)}
                             />
                           ))
