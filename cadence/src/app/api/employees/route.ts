@@ -193,7 +193,7 @@ export async function GET(request: NextRequest) {
              ec.EMPLOYMENT_STATUS, ec.HIRE_DATE, ec.TERMINATION_DATE,
              ec.LOCATION_KEY, dl.LOCATION_ID, ec.BRAND_KEY, ec.MANAGER_EMPLOYEE_KEY
       FROM ${SF_DB}.DIM_EMPLOYEE_CURATED ec
-      LEFT JOIN ${SF_DB}.DIM_LOCATION dl ON ec.LOCATION_KEY = dl.LOCATION_KEY
+      LEFT JOIN ${SF_DB}.DIM_LOCATION dl ON ec.LOCATION_KEY = dl.LOCATION_KEY AND dl.DEL_TS IS NULL
       WHERE ec.DEL_TS IS NULL
         AND ec.EMPLOYMENT_STATUS != 'Terminated'
     `;
@@ -206,6 +206,7 @@ export async function GET(request: NextRequest) {
       bindings[String(bindIdx++)] = sfText(locationId);
     }
 
+    sql += ` QUALIFY ROW_NUMBER() OVER (PARTITION BY ec.EMPLOYEE_ID ORDER BY ec.EMPLOYEE_KEY DESC) = 1`;
     sql += ` ORDER BY ec.LAST_NAME, ec.FIRST_NAME LIMIT 200`;
 
     const rows = await executeQuery<SfEmployee>(sql, bindings);
@@ -280,7 +281,7 @@ export async function POST(request: NextRequest) {
               ec.EMPLOYMENT_STATUS, ec.HIRE_DATE, ec.TERMINATION_DATE,
               ec.LOCATION_KEY, dl.LOCATION_ID, ec.BRAND_KEY, ec.MANAGER_EMPLOYEE_KEY
        FROM ${SF_DB}.DIM_EMPLOYEE_CURATED ec
-       LEFT JOIN ${SF_DB}.DIM_LOCATION dl ON ec.LOCATION_KEY = dl.LOCATION_KEY
+       LEFT JOIN ${SF_DB}.DIM_LOCATION dl ON ec.LOCATION_KEY = dl.LOCATION_KEY AND dl.DEL_TS IS NULL
        WHERE ec.EMPLOYEE_ID = ?`,
       { '1': sfText(employeeId) }
     );
