@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import {
   getEmployee,
   getDepartmentById,
-  getRoleById,
   getLocationById,
   updateEmployee,
   deleteEmployee,
@@ -138,7 +137,6 @@ export function EmployeeProfileDrawer({ employeeId, onClose }: EmployeeProfileDr
     }
   }
 
-  const role = employee ? getRoleById(employee.roleId) : undefined;
   const department = employee ? getDepartmentById(employee.departmentId) : undefined;
   const locations = employee
     ? employee.locationIds.map((id) => getLocationById(id)).filter(Boolean)
@@ -232,7 +230,7 @@ export function EmployeeProfileDrawer({ employeeId, onClose }: EmployeeProfileDr
                           {employee.name}
                         </div>
                         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                          {role?.name ?? employee.roleId}
+                          {employee.jobTitle || employee.roleId}
                           {department && <> · {department.name}</>}
                         </div>
                       </div>

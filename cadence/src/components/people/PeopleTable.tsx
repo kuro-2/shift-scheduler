@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import {
   getEmployees,
   getDepartmentById,
-  getRoleById,
   updateEmployee,
   DEPARTMENTS,
   ROLES,
@@ -90,7 +89,6 @@ function PersonRow({
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const role = getRoleById(employee.roleId);
   const department = getDepartmentById(employee.departmentId);
   const queryClient = useQueryClient();
 
@@ -151,7 +149,7 @@ function PersonRow({
       {/* Role */}
       <td style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
         <span style={{ fontSize: 13, color: 'var(--text)' }}>
-          {role?.name ?? employee.roleId}
+          {employee.jobTitle || employee.roleId}
         </span>
       </td>
 

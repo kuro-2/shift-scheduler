@@ -45,7 +45,17 @@ const STATUS_VARS = {
 
 // ─── Shift Card ───────────────────────────────────────────────────────────────
 
-function ShiftCard({ shift, isConflict, onClick }: { shift: Shift; isConflict: boolean; onClick: () => void }) {
+function ShiftCard({
+  shift,
+  jobTitle,
+  isConflict,
+  onClick,
+}: {
+  shift: Shift;
+  jobTitle?: string;
+  isConflict: boolean;
+  onClick: () => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const cfg = isConflict ? STATUS_VARS.conflict : (STATUS_VARS[shift.status as ShiftStatus] ?? STATUS_VARS.draft);
   const role = getRoleById(shift.roleId);
@@ -107,7 +117,7 @@ function ShiftCard({ shift, isConflict, onClick }: { shift: Shift; isConflict: b
           textOverflow: 'ellipsis',
         }}
       >
-        {role?.name ?? shift.roleId}
+        {jobTitle || role?.name || shift.roleId}
       </div>
     </button>
   );
@@ -471,7 +481,6 @@ export function WeekGrid({ days, departmentId }: WeekGridProps) {
 
             {/* ── Employee rows ── */}
             {activeEmployees.map((emp) => {
-              const role = getRoleById(emp.roleId);
               const stats = employeeStats.get(emp.id);
               const hours = stats?.hours ?? 0;
               const cost = stats?.cost ?? 0;
@@ -537,7 +546,7 @@ export function WeekGrid({ days, departmentId }: WeekGridProps) {
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {role?.name ?? emp.roleId} · {hours.toFixed(1)}h · {formatMoney(cost)}
+                        {emp.jobTitle || emp.roleId} · {hours.toFixed(1)}h · {formatMoney(cost)}
                       </div>
                     </div>
                   </div>
@@ -566,6 +575,7 @@ export function WeekGrid({ days, departmentId }: WeekGridProps) {
                             <ShiftCard
                               key={shift.id}
                               shift={shift}
+                              jobTitle={emp.jobTitle}
                               isConflict={conflictShiftIds.has(shift.id)}
                               onClick={() => setSelectedShiftId(shift.id)}
                             />

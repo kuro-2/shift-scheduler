@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@/store/ui.store';
 import { useAuthStore } from '@/store/auth.store';
 import { Avatar } from '@/components/common/Avatar';
-import { getEmployees, getLocations, getEmployeeById, ROLES, DEPARTMENTS } from '@/services/employees.service';
+import { getEmployees, getLocations, getEmployeeById, DEPARTMENTS } from '@/services/employees.service';
 import { createShift, updateShift, getShift } from '@/services/shifts.service';
 import type { CreateShiftInput } from '@/types';
 
@@ -52,7 +52,7 @@ function computeHours(start: string, end: string, breakMin: number): number {
 const DEFAULT_FORM: ShiftForm = {
   assignedPeople: [],
   openShift: false,
-  roleId: ROLES[0].id,
+  roleId: '',
   departmentId: DEPARTMENTS[0].id,
   date: new Date().toISOString().slice(0, 10),
   startTime: '09:00',
@@ -93,13 +93,33 @@ export function CreateShiftDrawer() {
     enabled: !!editingShiftId,
   });
 
-  // Default location (create mode only) — prefer the logged-in user's own location
-  // so newly created shifts show up in their schedule view without an extra click
+  // Restrict the location picker to the logged-in user's own location — managers
+  // create shifts for their own store, not other locations across the company
+  const availableLocations = useMemo(
+    () =>
+      (locations ?? []).filter(
+        (l) => !sessionLocationId || (l.locationId ?? l.id) === sessionLocationId
+      ),
+    [locations, sessionLocationId]
+  );
+
+  // Default location (create mode only)
   const defaultLocationId =
-    !isEditing && locations && locations.length > 0
-      ? (sessionLocationId ?? locations[0].locationId ?? locations[0].id)
+    !isEditing && availableLocations.length > 0
+      ? (availableLocations[0].locationId ?? availableLocations[0].id)
       : '';
   const effectiveLocationId = form.locationId || defaultLocationId;
+
+  // Role options are the real job titles held by employees at the selected location
+  const locationJobTitles = useMemo(() => {
+    const titles = new Set<string>();
+    for (const e of employees ?? []) {
+      if (effectiveLocationId && !e.locationIds.includes(effectiveLocationId)) continue;
+      if (e.jobTitle) titles.add(e.jobTitle);
+    }
+    return Array.from(titles).sort();
+  }, [employees, effectiveLocationId]);
+  const effectiveRoleId = form.roleId || locationJobTitles[0] || '';
 
   // Reset the form each time the drawer opens fresh (create mode), applying any prefill
   useEffect(() => {
@@ -214,7 +234,7 @@ export function CreateShiftDrawer() {
         startTime: form.startTime,
         endTime: form.endTime,
         breakMinutes: form.breakMinutes,
-        roleId: form.roleId,
+        roleId: effectiveRoleId,
         departmentId: form.departmentId,
         locationId: effectiveLocationId,
         notes: form.notes || undefined,
@@ -258,7 +278,7 @@ export function CreateShiftDrawer() {
         startTime: form.startTime,
         endTime: form.endTime,
         breakMinutes: form.breakMinutes,
-        roleId: form.roleId,
+        roleId: effectiveRoleId,
         departmentId: form.departmentId,
         locationId: effectiveLocationId,
         notes: form.notes || undefined,
@@ -275,8 +295,7 @@ export function CreateShiftDrawer() {
     }
   }
 
-  const currentRole = ROLES.find((r) => r.id === form.roleId) ?? ROLES[0];
-  const currentDepartment = DEPARTMENTS.find((d) => d.id === currentRole.departmentId);
+  const currentDepartment = DEPARTMENTS.find((d) => d.id === form.departmentId);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -545,15 +564,19 @@ export function CreateShiftDrawer() {
                       }}
                     />
                     <select
-                      value={form.roleId}
+                      value={effectiveRoleId}
                       onChange={(e) => setForm((f) => ({ ...f, roleId: e.target.value }))}
                       style={{ ...inputStyle, paddingLeft: 24 }}
                     >
-                      {ROLES.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.name}
-                        </option>
-                      ))}
+                      {locationJobTitles.length === 0 ? (
+                        <option value="">No job titles at this location</option>
+                      ) : (
+                        locationJobTitles.map((title) => (
+                          <option key={title} value={title}>
+                            {title}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                 </div>
@@ -631,7 +654,7 @@ export function CreateShiftDrawer() {
                     onChange={(e) => setForm((f) => ({ ...f, locationId: e.target.value }))}
                     style={{ ...inputStyle, opacity: isEditing ? 0.6 : 1 }}
                   >
-                    {(locations ?? []).map((l) => (
+                    {(isEditing ? (locations ?? []) : availableLocations).map((l) => (
                       <option key={l.id} value={l.locationId ?? l.id}>
                         {l.name}
                       </option>

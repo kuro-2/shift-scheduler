@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { Avatar } from '@/components/common/Avatar';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { EmployeeProfileDrawer } from '@/components/people/EmployeeProfileDrawer';
-import { getEmployeeById, getRoleById } from '@/services/employees.service';
+import { getEmployeeById } from '@/services/employees.service';
 import { CURRENT_EMPLOYEE_ID } from '@/components/mobile/current-employee';
 import { useState } from 'react';
 
@@ -30,7 +30,6 @@ interface MenuRow {
 export default function MobileMorePage() {
   const [profileOpen, setProfileOpen] = useState(false);
   const employee = getEmployeeById(CURRENT_EMPLOYEE_ID);
-  const role = employee ? getRoleById(employee.roleId) : undefined;
 
   const rows: MenuRow[] = [
     { id: 'profile', label: 'My profile', Icon: User, onClick: () => setProfileOpen(true) },
@@ -74,7 +73,7 @@ export default function MobileMorePage() {
             {employee?.name ?? 'Sam Reyes'}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
-            {role?.name ?? 'Operations Associate'}
+            {employee?.jobTitle || 'Team Member'}
           </div>
         </div>
       </div>
