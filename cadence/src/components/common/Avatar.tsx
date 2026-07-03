@@ -7,9 +7,10 @@ interface AvatarProps {
   color: string; // hex
   size?: number; // default 32
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function Avatar({ initials, color, size = 32, className }: AvatarProps) {
+export function Avatar({ initials, color, size = 32, className, style }: AvatarProps) {
   const fontSize = Math.round(size * 0.375);
 
   return (
@@ -24,6 +25,7 @@ export function Avatar({ initials, color, size = 32, className }: AvatarProps) {
         fontSize,
         fontWeight: 600,
         letterSpacing: '0.02em',
+        ...style,
       }}
     >
       {initials}

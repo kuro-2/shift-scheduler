@@ -1,480 +1,28 @@
 import type { Shift, ShiftFilter, CreateShiftInput, UpdateShiftInput } from '@/types';
-import { mockDelay, generateId } from '@/lib/utils';
+import { apiFetch } from '@/lib/api-url';
 
-// ─── Seed Data: Week of Jun 22–28, 2026 ───────────────────────────────────────
+// ─── In-memory cache (populated by getShifts, read by getShiftById) ─────────
 
-const SEED_SHIFTS: Shift[] = [
-  // Monday June 22
-  {
-    id: 'shift_001',
-    employeeId: 'emp_001',
-    date: '2026-06-22',
-    startTime: '08:00',
-    endTime: '16:30',
-    breakMinutes: 30,
-    roleId: 'role_shift_lead',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_002',
-    employeeId: 'emp_005',
-    date: '2026-06-22',
-    startTime: '08:00',
-    endTime: '16:30',
-    breakMinutes: 30,
-    roleId: 'role_ops_associate',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_003',
-    employeeId: 'emp_003',
-    date: '2026-06-22',
-    startTime: '09:00',
-    endTime: '13:00',
-    breakMinutes: 0,
-    roleId: 'role_receptionist',
-    departmentId: 'dept_front',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_004',
-    employeeId: 'emp_007',
-    date: '2026-06-22',
-    startTime: '13:00',
-    endTime: '21:00',
-    breakMinutes: 30,
-    roleId: 'role_concierge',
-    departmentId: 'dept_front',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_005',
-    employeeId: 'emp_002',
-    date: '2026-06-22',
-    startTime: '09:00',
-    endTime: '17:30',
-    breakMinutes: 30,
-    roleId: 'role_senior_sales',
-    departmentId: 'dept_sales',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_006',
-    employeeId: 'emp_009',
-    date: '2026-06-22',
-    startTime: '10:00',
-    endTime: '18:30',
-    breakMinutes: 30,
-    roleId: 'role_sales_rep',
-    departmentId: 'dept_sales',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-
-  // Tuesday June 23
-  {
-    id: 'shift_007',
-    employeeId: 'emp_001',
-    date: '2026-06-23',
-    startTime: '08:00',
-    endTime: '16:30',
-    breakMinutes: 30,
-    roleId: 'role_shift_lead',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_008',
-    employeeId: 'emp_008',
-    date: '2026-06-23',
-    startTime: '08:00',
-    endTime: '14:00',
-    breakMinutes: 30,
-    roleId: 'role_ops_associate',
-    departmentId: 'dept_ops',
-    locationId: 'loc_north',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_009',
-    employeeId: 'emp_006',
-    date: '2026-06-23',
-    startTime: '09:00',
-    endTime: '17:30',
-    breakMinutes: 30,
-    roleId: 'role_sales_rep',
-    departmentId: 'dept_sales',
-    locationId: 'loc_north',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_010',
-    employeeId: 'emp_003',
-    date: '2026-06-23',
-    startTime: '13:00',
-    endTime: '17:00',
-    breakMinutes: 0,
-    roleId: 'role_receptionist',
-    departmentId: 'dept_front',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  // Open shift - needs coverage
-  {
-    id: 'shift_011',
-    employeeId: null,
-    date: '2026-06-23',
-    startTime: '06:00',
-    endTime: '14:00',
-    breakMinutes: 30,
-    roleId: 'role_ops_associate',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'open',
-    requiredSkills: ['forklift', 'safety_certified'],
-  },
-
-  // Wednesday June 24
-  {
-    id: 'shift_012',
-    employeeId: 'emp_005',
-    date: '2026-06-24',
-    startTime: '08:00',
-    endTime: '16:30',
-    breakMinutes: 30,
-    roleId: 'role_ops_associate',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_013',
-    employeeId: 'emp_007',
-    date: '2026-06-24',
-    startTime: '09:00',
-    endTime: '17:30',
-    breakMinutes: 30,
-    roleId: 'role_concierge',
-    departmentId: 'dept_front',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_014',
-    employeeId: 'emp_009',
-    date: '2026-06-24',
-    startTime: '10:00',
-    endTime: '18:30',
-    breakMinutes: 30,
-    roleId: 'role_sales_rep',
-    departmentId: 'dept_sales',
-    locationId: 'loc_main',
-    status: 'conflict',
-    warning: 'overlap',
-    notes: 'Overlaps with scheduled remote session',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_015',
-    employeeId: 'emp_002',
-    date: '2026-06-24',
-    startTime: '09:00',
-    endTime: '17:30',
-    breakMinutes: 30,
-    roleId: 'role_senior_sales',
-    departmentId: 'dept_sales',
-    locationId: 'loc_main',
-    status: 'filled',
-    warning: 'overtime',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-
-  // Thursday June 25 (today minus 4 days in context, but in our seed it's current week)
-  {
-    id: 'shift_016',
-    employeeId: 'emp_001',
-    date: '2026-06-25',
-    startTime: '08:00',
-    endTime: '16:30',
-    breakMinutes: 30,
-    roleId: 'role_shift_lead',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_017',
-    employeeId: 'emp_004',
-    date: '2026-06-25',
-    startTime: '09:00',
-    endTime: '17:30',
-    breakMinutes: 30,
-    roleId: 'role_manager',
-    departmentId: 'dept_mgmt',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_018',
-    employeeId: 'emp_006',
-    date: '2026-06-25',
-    startTime: '09:00',
-    endTime: '17:30',
-    breakMinutes: 30,
-    roleId: 'role_sales_rep',
-    departmentId: 'dept_sales',
-    locationId: 'loc_north',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_019',
-    employeeId: 'emp_003',
-    date: '2026-06-25',
-    startTime: '09:00',
-    endTime: '13:00',
-    breakMinutes: 0,
-    roleId: 'role_receptionist',
-    departmentId: 'dept_front',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_020',
-    employeeId: 'emp_008',
-    date: '2026-06-25',
-    startTime: '10:00',
-    endTime: '16:00',
-    breakMinutes: 30,
-    roleId: 'role_ops_associate',
-    departmentId: 'dept_ops',
-    locationId: 'loc_north',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-
-  // Friday June 26
-  {
-    id: 'shift_021',
-    employeeId: 'emp_001',
-    date: '2026-06-26',
-    startTime: '08:00',
-    endTime: '16:30',
-    breakMinutes: 30,
-    roleId: 'role_shift_lead',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_022',
-    employeeId: 'emp_005',
-    date: '2026-06-26',
-    startTime: '08:00',
-    endTime: '16:30',
-    breakMinutes: 30,
-    roleId: 'role_ops_associate',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_023',
-    employeeId: 'emp_009',
-    date: '2026-06-26',
-    startTime: '09:00',
-    endTime: '17:30',
-    breakMinutes: 30,
-    roleId: 'role_sales_rep',
-    departmentId: 'dept_sales',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_024',
-    employeeId: 'emp_007',
-    date: '2026-06-26',
-    startTime: '13:00',
-    endTime: '21:00',
-    breakMinutes: 30,
-    roleId: 'role_concierge',
-    departmentId: 'dept_front',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  // Draft shift not yet published
-  {
-    id: 'shift_025',
-    employeeId: null,
-    date: '2026-06-26',
-    startTime: '14:00',
-    endTime: '22:00',
-    breakMinutes: 30,
-    roleId: 'role_ops_associate',
-    departmentId: 'dept_ops',
-    locationId: 'loc_north',
-    status: 'draft',
-    notes: 'Evening coverage needed',
-  },
-
-  // Saturday June 27
-  {
-    id: 'shift_026',
-    employeeId: 'emp_005',
-    date: '2026-06-27',
-    startTime: '08:00',
-    endTime: '14:00',
-    breakMinutes: 30,
-    roleId: 'role_ops_associate',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_027',
-    employeeId: 'emp_003',
-    date: '2026-06-27',
-    startTime: '09:00',
-    endTime: '13:00',
-    breakMinutes: 0,
-    roleId: 'role_receptionist',
-    departmentId: 'dept_front',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_028',
-    employeeId: null,
-    date: '2026-06-27',
-    startTime: '14:00',
-    endTime: '21:00',
-    breakMinutes: 30,
-    roleId: 'role_sales_rep',
-    departmentId: 'dept_sales',
-    locationId: 'loc_main',
-    status: 'open',
-    requiredSkills: ['customer_service'],
-  },
-
-  // Sunday June 28
-  {
-    id: 'shift_029',
-    employeeId: 'emp_007',
-    date: '2026-06-28',
-    startTime: '10:00',
-    endTime: '18:00',
-    breakMinutes: 30,
-    roleId: 'role_concierge',
-    departmentId: 'dept_front',
-    locationId: 'loc_main',
-    status: 'filled',
-    publishedAt: '2026-06-15T10:00:00Z',
-  },
-  {
-    id: 'shift_030',
-    employeeId: null,
-    date: '2026-06-28',
-    startTime: '08:00',
-    endTime: '16:00',
-    breakMinutes: 30,
-    roleId: 'role_ops_associate',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'open',
-    requiredSkills: ['safety_certified'],
-  },
-
-  // Next week preview (Jun 29 – draft)
-  {
-    id: 'shift_031',
-    employeeId: 'emp_001',
-    date: '2026-06-29',
-    startTime: '08:00',
-    endTime: '16:30',
-    breakMinutes: 30,
-    roleId: 'role_shift_lead',
-    departmentId: 'dept_ops',
-    locationId: 'loc_main',
-    status: 'draft',
-  },
-  {
-    id: 'shift_032',
-    employeeId: 'emp_002',
-    date: '2026-06-29',
-    startTime: '09:00',
-    endTime: '17:30',
-    breakMinutes: 30,
-    roleId: 'role_senior_sales',
-    departmentId: 'dept_sales',
-    locationId: 'loc_main',
-    status: 'draft',
-  },
-];
-
-// ─── In-Memory Store ──────────────────────────────────────────────────────────
-
-let shiftsStore: Shift[] = [...SEED_SHIFTS];
+let shiftsCache: Shift[] = [];
 
 // ─── Service Functions ────────────────────────────────────────────────────────
 
 export async function getShifts(filter?: ShiftFilter): Promise<Shift[]> {
-  await mockDelay();
-  let result = [...shiftsStore];
+  const params = new URLSearchParams();
+  if (filter?.weekStart) params.set('weekStart', filter.weekStart);
+  if (filter?.dateRange?.start) params.set('dateFrom', filter.dateRange.start);
+  if (filter?.dateRange?.end) params.set('dateTo', filter.dateRange.end);
+  if (filter?.locationId) params.set('locationId', filter.locationId);
+  if (filter?.employeeId) params.set('employeeId', filter.employeeId);
+  const qs = params.toString();
 
-  if (filter?.weekStart) {
-    // Return shifts for the 7-day window starting at weekStart
-    const start = filter.weekStart;
-    const [y, m, d] = start.split('-').map(Number);
-    const endDate = new Date(y, m - 1, d + 6);
-    const end = endDate.toISOString().split('T')[0];
-    result = result.filter((s) => s.date >= start && s.date <= end);
-  } else if (filter?.dateRange) {
-    result = result.filter(
-      (s) => s.date >= filter.dateRange!.start && s.date <= filter.dateRange!.end
-    );
-  }
+  const shifts = await apiFetch<Shift[]>(`/api/shifts${qs ? `?${qs}` : ''}`);
+  shiftsCache = shifts;
 
-  if (filter?.departmentId) {
-    result = result.filter((s) => s.departmentId === filter.departmentId);
-  }
-  if (filter?.employeeId) {
-    result = result.filter((s) => s.employeeId === filter.employeeId);
-  }
-  if (filter?.locationId) {
-    result = result.filter((s) => s.locationId === filter.locationId);
-  }
-  if (filter?.status) {
-    result = result.filter((s) => s.status === filter.status);
-  }
+  // Apply status/department filters client-side (not worth extra DB params)
+  let result = shifts;
+  if (filter?.departmentId) result = result.filter((s) => s.departmentId === filter.departmentId);
+  if (filter?.status) result = result.filter((s) => s.status === filter.status);
 
   return result.sort((a, b) =>
     a.date !== b.date ? a.date.localeCompare(b.date) : a.startTime.localeCompare(b.startTime)
@@ -482,80 +30,90 @@ export async function getShifts(filter?: ShiftFilter): Promise<Shift[]> {
 }
 
 export async function getShift(id: string): Promise<Shift | null> {
-  await mockDelay(100, 300);
-  return shiftsStore.find((s) => s.id === id) ?? null;
+  return shiftsCache.find((s) => s.id === id) ?? null;
 }
 
 export async function createShift(input: CreateShiftInput): Promise<Shift> {
-  await mockDelay();
-  const newShift: Shift = {
-    id: generateId('shift'),
-    employeeId: input.employeeId,
-    date: input.date,
-    startTime: input.startTime,
-    endTime: input.endTime,
-    breakMinutes: input.breakMinutes ?? 30,
-    roleId: input.roleId,
-    departmentId: input.departmentId,
-    locationId: input.locationId,
-    status: input.employeeId ? 'draft' : 'open',
-    notes: input.notes,
-    requiredSkills: input.requiredSkills,
-  };
-  shiftsStore.push(newShift);
-  return newShift;
+  const shift = await apiFetch<Shift>('/api/shifts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  shiftsCache = [...shiftsCache, shift];
+  return shift;
 }
 
 export async function updateShift(id: string, patch: UpdateShiftInput): Promise<Shift> {
-  await mockDelay();
-  const index = shiftsStore.findIndex((s) => s.id === id);
-  if (index === -1) throw new Error(`Shift ${id} not found`);
-  shiftsStore[index] = { ...shiftsStore[index], ...patch };
-  return shiftsStore[index];
+  await apiFetch(`/api/shifts/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  shiftsCache = shiftsCache.map((s) => {
+    if (s.id !== id) return s;
+    const updated = { ...s, ...patch };
+    if (patch.startTime || patch.endTime || patch.breakMinutes !== undefined) {
+      updated.hoursWorked = computeHoursWorked(updated.startTime, updated.endTime, updated.breakMinutes);
+    }
+    return updated;
+  });
+  return shiftsCache.find((s) => s.id === id) ?? ({ id, ...patch } as Shift);
 }
 
 export async function deleteShift(id: string): Promise<void> {
-  await mockDelay(150, 400);
-  const index = shiftsStore.findIndex((s) => s.id === id);
-  if (index === -1) throw new Error(`Shift ${id} not found`);
-  shiftsStore.splice(index, 1);
+  await apiFetch(`/api/shifts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  shiftsCache = shiftsCache.filter((s) => s.id !== id);
 }
 
 export async function publishWeek(weekStart: string): Promise<{ published: number }> {
-  await mockDelay(400, 800);
-  const [y, m, d] = weekStart.split('-').map(Number);
-  const endDate = new Date(y, m - 1, d + 6);
-  const weekEnd = endDate.toISOString().split('T')[0];
-  const now = new Date().toISOString();
-
-  let published = 0;
-  shiftsStore = shiftsStore.map((shift) => {
-    if (
-      shift.date >= weekStart &&
-      shift.date <= weekEnd &&
-      (shift.status === 'draft' || shift.status === 'filled') &&
-      !shift.publishedAt
-    ) {
-      published++;
-      return {
-        ...shift,
-        status: shift.employeeId ? 'filled' : 'open',
-        publishedAt: now,
-      };
-    }
-    return shift;
+  return apiFetch<{ published: number }>('/api/shifts/publish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ weekStart }),
   });
-
-  return { published };
 }
 
-export async function assignShift(
-  shiftId: string,
-  employeeId: string
-): Promise<Shift> {
+export async function assignShift(shiftId: string, employeeId: string): Promise<Shift> {
   return updateShift(shiftId, { employeeId, status: 'filled' });
 }
 
 export async function unassignShift(shiftId: string): Promise<Shift> {
   return updateShift(shiftId, { employeeId: null, status: 'open' });
 }
+
+export async function getWeeklyLaborSummary(locationId: string, weekStart: string) {
+  return apiFetch<unknown[]>(
+    `/api/reports?locationId=${encodeURIComponent(locationId)}&weekStart=${encodeURIComponent(weekStart)}`
+  );
+}
+
+export async function getShiftTypes() {
+  // DIM_SHIFT is read from Snowflake; if unavailable return static list
+  return STATIC_SHIFT_TYPES;
+}
+
+// ─── Synchronous lookup helper ────────────────────────────────────────────────
+
+export function getShiftById(id: string): Shift | undefined {
+  return shiftsCache.find((s) => s.id === id);
+}
+
+// ─── Private helpers ──────────────────────────────────────────────────────────
+
+function computeHoursWorked(startTime: string, endTime: string, breakMinutes: number): number {
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  let totalMinutes = eh * 60 + em - (sh * 60 + sm);
+  if (totalMinutes < 0) totalMinutes += 24 * 60;
+  return Math.round(((totalMinutes - breakMinutes) / 60) * 100) / 100;
+}
+
+const STATIC_SHIFT_TYPES = [
+  { shiftKey: 1, shiftId: 'ST_MORNING', shiftName: 'Morning', startTime: '06:00', endTime: '14:00', durationHours: 8, shiftType: 'Standard', isOvernight: false, shiftStatus: 'Active' },
+  { shiftKey: 2, shiftId: 'ST_DAY', shiftName: 'Day', startTime: '08:00', endTime: '16:30', durationHours: 8, shiftType: 'Standard', isOvernight: false, shiftStatus: 'Active' },
+  { shiftKey: 3, shiftId: 'ST_AFTERNOON', shiftName: 'Afternoon', startTime: '13:00', endTime: '21:00', durationHours: 8, shiftType: 'Standard', isOvernight: false, shiftStatus: 'Active' },
+  { shiftKey: 4, shiftId: 'ST_EVENING', shiftName: 'Evening', startTime: '14:00', endTime: '22:00', durationHours: 8, shiftType: 'Standard', isOvernight: false, shiftStatus: 'Active' },
+  { shiftKey: 5, shiftId: 'ST_OVERNIGHT', shiftName: 'Overnight', startTime: '22:00', endTime: '06:00', durationHours: 8, shiftType: 'Overnight', isOvernight: true, shiftStatus: 'Active' },
+  { shiftKey: 6, shiftId: 'ST_PART_AM', shiftName: 'Part-Time AM', startTime: '09:00', endTime: '13:00', durationHours: 4, shiftType: 'Part-Time', isOvernight: false, shiftStatus: 'Active' },
+  { shiftKey: 7, shiftId: 'ST_PART_PM', shiftName: 'Part-Time PM', startTime: '13:00', endTime: '17:00', durationHours: 4, shiftType: 'Part-Time', isOvernight: false, shiftStatus: 'Active' },
+];

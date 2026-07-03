@@ -10,7 +10,12 @@ type Status =
   | 'part-time'
   | 'inactive'
   | 'on_time'
-  | 'late';
+  | 'late'
+  | 'no_show'
+  | 'on_shift'
+  | 'on_break'
+  | 'complete'
+  | 'sick';
 
 interface StatusPillProps {
   status: Status;
@@ -76,10 +81,40 @@ const STATUS_CONFIG: Record<
     label: 'On time',
   },
   late: {
+    bg: 'var(--open-bg)',
+    text: 'var(--open-text)',
+    dot: 'var(--open-dot)',
+    label: 'Late',
+  },
+  no_show: {
     bg: 'var(--conflict-bg)',
     text: 'var(--conflict-text)',
     dot: 'var(--conflict-dot)',
-    label: 'Late',
+    label: 'No show',
+  },
+  on_shift: {
+    bg: 'var(--pending-bg)',
+    text: 'var(--pending-text)',
+    dot: 'var(--pending-dot)',
+    label: 'On shift',
+  },
+  on_break: {
+    bg: 'var(--draft-bg)',
+    text: 'var(--draft-text)',
+    dot: 'var(--draft-dot)',
+    label: 'On break',
+  },
+  complete: {
+    bg: 'var(--filled-bg)',
+    text: 'var(--filled-text)',
+    dot: 'var(--filled-dot)',
+    label: 'Complete',
+  },
+  sick: {
+    bg: 'var(--draft-bg)',
+    text: 'var(--draft-text)',
+    dot: 'var(--draft-dot)',
+    label: 'Sick',
   },
 };
 

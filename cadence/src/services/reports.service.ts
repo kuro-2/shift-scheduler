@@ -4,213 +4,98 @@ import type {
   DepartmentBreakdown,
   TopPerformer,
   DateRange,
+  KPICard,
 } from '@/types';
-import { mockDelay } from '@/lib/utils';
+import { apiFetch } from '@/lib/api-url';
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-
-function randomBetween(min: number, max: number): number {
-  return Math.round((Math.random() * (max - min) + min) * 100) / 100;
+interface ReportsApiResponse {
+  summary: {
+    totalLaborCost: number;
+    regularHours: number;
+    overtimeHours: number;
+    totalHours: number;
+    totalExpenses: number;
+    headcount: number;
+  };
+  laborCostData: LaborCostDataPoint[];
+  departmentBreakdown: DepartmentBreakdown[];
+  topPerformers: TopPerformer[];
+  expenses: { expenseType: string; expenseMonth: string; totalExpenseAmt: number }[];
 }
 
-// ─── Mock Data Generators ─────────────────────────────────────────────────────
+async function fetchReports(locationId?: string, range?: DateRange): Promise<ReportsApiResponse> {
+  const params = new URLSearchParams();
+  if (locationId) params.set('locationId', locationId);
+  if (range?.start) params.set('dateFrom', range.start);
+  if (range?.end) params.set('dateTo', range.end);
+  const qs = params.toString();
+  return apiFetch<ReportsApiResponse>(`/api/reports${qs ? `?${qs}` : ''}`);
+}
 
-const CURRENT_WEEK_LABOR_COST: LaborCostDataPoint[] = [
-  { date: '2026-06-22', actual: 4820, budget: 5000, projected: 4920 },
-  { date: '2026-06-23', actual: 5140, budget: 5000, projected: 5100 },
-  { date: '2026-06-24', actual: 4980, budget: 5000, projected: 4980 },
-  { date: '2026-06-25', actual: 5380, budget: 5000, projected: 5300 },
-  { date: '2026-06-26', actual: 5210, budget: 5000, projected: 5150 },
-  { date: '2026-06-27', actual: 2640, budget: 2800, projected: 2700 },
-  { date: '2026-06-28', actual: 1820, budget: 2000, projected: 1900 },
-];
+export async function getReportsSummary(
+  locationId?: string,
+  dateRange?: DateRange
+): Promise<ReportsSummary> {
+  const data = await fetchReports(locationId, dateRange);
+  const s = data.summary;
+  const avgRate = s.totalHours > 0 ? Math.round(s.totalLaborCost / s.totalHours) : 0;
 
-const DEPARTMENT_BREAKDOWN: DepartmentBreakdown[] = [
-  {
-    departmentId: 'dept_ops',
-    name: 'Operations',
-    color: '#7C6AC4',
-    hours: 156,
-    cost: 13644,
-    headcount: 3,
-    percentage: 38.5,
-  },
-  {
-    departmentId: 'dept_sales',
-    name: 'Sales',
-    color: '#5A9B6E',
-    hours: 122,
-    cost: 11284,
-    headcount: 3,
-    percentage: 30.1,
-  },
-  {
-    departmentId: 'dept_front',
-    name: 'Front Desk',
-    color: '#C76054',
-    hours: 96,
-    cost: 7728,
-    headcount: 3,
-    percentage: 23.7,
-  },
-  {
-    departmentId: 'dept_mgmt',
-    name: 'Management',
-    color: '#3D4D8A',
-    hours: 40,
-    cost: 7200,
-    headcount: 1,
-    percentage: 7.7,
-  },
-];
-
-const TOP_PERFORMERS: TopPerformer[] = [
-  {
-    employeeId: 'emp_001',
-    name: 'Alex Mercer',
-    initials: 'AM',
-    avatarColor: '#7C6AC4',
-    punctualityScore: 98.2,
-    hoursWorked: 40,
-    shiftsCompleted: 5,
-    overtimeHours: 0,
-  },
-  {
-    employeeId: 'emp_004',
-    name: 'Priya Shah',
-    initials: 'PS',
-    avatarColor: '#3D4D8A',
-    punctualityScore: 100,
-    hoursWorked: 40,
-    shiftsCompleted: 5,
-    overtimeHours: 0,
-  },
-  {
-    employeeId: 'emp_007',
-    name: 'Devon Lee',
-    initials: 'DL',
-    avatarColor: '#6373B5',
-    punctualityScore: 97.5,
-    hoursWorked: 40,
-    shiftsCompleted: 5,
-    overtimeHours: 0,
-  },
-  {
-    employeeId: 'emp_002',
-    name: 'Jordan Park',
-    initials: 'JP',
-    avatarColor: '#5A9B6E',
-    punctualityScore: 95.8,
-    hoursWorked: 42.5,
-    shiftsCompleted: 5,
-    overtimeHours: 2.5,
-  },
-  {
-    employeeId: 'emp_005',
-    name: 'Sam Reyes',
-    initials: 'SR',
-    avatarColor: '#D4A04A',
-    punctualityScore: 88.4,
-    hoursWorked: 39.5,
-    shiftsCompleted: 5,
-    overtimeHours: 0,
-  },
-];
-
-// ─── Service Functions ────────────────────────────────────────────────────────
-
-export async function getReportsSummary(_range?: DateRange): Promise<ReportsSummary> {
-  await mockDelay(300, 600);
+  const kpis: KPICard[] = [
+    { label: 'Total Labor Cost', value: `$${s.totalLaborCost.toLocaleString()}`, change: 0, trend: 'neutral', goodDirection: 'down' },
+    { label: 'Total Hours', value: s.totalHours.toFixed(1), change: 0, trend: 'neutral' },
+    { label: 'Overtime Hours', value: s.overtimeHours.toFixed(1), change: 0, trend: 'neutral', goodDirection: 'down' },
+    { label: 'Headcount', value: String(s.headcount), change: 0, trend: 'neutral' },
+    { label: 'Avg Hourly Rate', value: `$${avgRate}`, change: 0, trend: 'neutral' },
+  ];
 
   return {
-    kpis: [
-      {
-        label: 'Total Labor Cost',
-        value: '$39,856',
-        change: -3.2,
-        trend: 'down',
-      },
-      {
-        label: 'Scheduled Hours',
-        value: '414h',
-        change: 2.1,
-        trend: 'up',
-      },
-      {
-        label: 'Avg Punctuality',
-        value: '94.8%',
-        change: 1.4,
-        trend: 'up',
-      },
-      {
-        label: 'Open Shifts',
-        value: '3',
-        change: -40,
-        trend: 'down',
-      },
-      {
-        label: 'Overtime Hours',
-        value: '12.5h',
-        change: -18.3,
-        trend: 'down',
-      },
-      {
-        label: 'Schedule Fill Rate',
-        value: '91%',
-        change: 4.5,
-        trend: 'up',
-      },
-    ],
-    period: {
-      start: '2026-06-22',
-      end: '2026-06-28',
-    },
+    kpis,
+    period: dateRange ?? { start: '', end: '' },
   };
 }
 
-export async function getLaborCostChart(_range?: DateRange): Promise<LaborCostDataPoint[]> {
-  await mockDelay(250, 500);
-  return [...CURRENT_WEEK_LABOR_COST];
+export async function getLaborCostData(
+  locationId?: string,
+  dateRange?: DateRange
+): Promise<LaborCostDataPoint[]> {
+  const data = await fetchReports(locationId, dateRange);
+  return data.laborCostData;
 }
 
-export async function getDepartmentBreakdown(): Promise<DepartmentBreakdown[]> {
-  await mockDelay(200, 450);
-  return [...DEPARTMENT_BREAKDOWN];
+export const getLaborCostChart = getLaborCostData;
+
+export async function getDepartmentBreakdown(
+  locationId?: string,
+  dateRange?: DateRange
+): Promise<DepartmentBreakdown[]> {
+  const data = await fetchReports(locationId, dateRange);
+  return data.departmentBreakdown;
 }
 
-export async function getTopPerformers(limit = 5): Promise<TopPerformer[]> {
-  await mockDelay(200, 400);
-  return TOP_PERFORMERS.slice(0, limit);
+export async function getTopPerformers(
+  locationId?: string,
+  dateRange?: DateRange
+): Promise<TopPerformer[]> {
+  const data = await fetchReports(locationId, dateRange);
+  return data.topPerformers;
 }
 
-export async function getWeeklyHoursByEmployee(): Promise<
-  { employeeId: string; name: string; hours: number; budget: number }[]
-> {
-  await mockDelay();
-  return [
-    { employeeId: 'emp_001', name: 'Alex Mercer', hours: 40, budget: 40 },
-    { employeeId: 'emp_002', name: 'Jordan Park', hours: 42.5, budget: 40 },
-    { employeeId: 'emp_003', name: 'Sarah Kim', hours: 20, budget: 32 },
-    { employeeId: 'emp_004', name: 'Priya Shah', hours: 40, budget: 40 },
-    { employeeId: 'emp_005', name: 'Sam Reyes', hours: 39.5, budget: 40 },
-    { employeeId: 'emp_006', name: 'Naomi West', hours: 36, budget: 40 },
-    { employeeId: 'emp_007', name: 'Devon Lee', hours: 40, budget: 40 },
-    { employeeId: 'emp_008', name: 'Marcus Chen', hours: 28, budget: 32 },
-    { employeeId: 'emp_009', name: 'Riley Hayes', hours: 32, budget: 40 },
-  ];
+export async function getMonthlyExpenses(locationId: string, _month: string) {
+  const data = await fetchReports(locationId);
+  return data.expenses;
 }
 
-export async function getLaborCostByDayOfWeek(): Promise<
-  { day: string; cost: number; budget: number }[]
-> {
-  await mockDelay();
-  return [
-    { day: 'Mon', cost: 4820, budget: 5000 },
-    { day: 'Tue', cost: 5140, budget: 5000 },
-    { day: 'Wed', cost: 4980, budget: 5000 },
-    { day: 'Thu', cost: 5380, budget: 5000 },
-    { day: 'Fri', cost: 5210, budget: 5000 },
-    { day: 'Sat', cost: 2640, budget: 2800 },
-    { day: 'Sun', cost: 1820, budget: 2000 },
-  ];
+export async function createExpenseEntry(input: {
+  locationId: string;
+  expenseType: string;
+  expenseMonth: string;
+  expenseAmt: number;
+  expenseDt: string;
+  comments?: string;
+}): Promise<void> {
+  await apiFetch('/api/reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
 }

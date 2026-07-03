@@ -6,13 +6,22 @@ import {
   addDays,
   addWeeks,
   subWeeks,
+  addMonths,
+  subMonths,
+  addYears,
+  subYears,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
   isSameDay,
+  isSameMonth,
   isToday,
   isWithinInterval,
   differenceInMinutes,
   differenceInHours,
   differenceInCalendarDays,
   eachDayOfInterval,
+  eachMonthOfInterval,
   getDay,
   setHours,
   setMinutes,
@@ -22,29 +31,28 @@ import {
   isPast,
   isFuture,
   isValid,
-  parse,
 } from 'date-fns';
 
 // ─── Week Helpers ─────────────────────────────────────────────────────────────
 
 /**
- * Returns the Monday of the week containing the given date.
+ * Returns the Sunday of the week containing the given date.
  */
 export function getWeekStart(date: Date | string): Date {
   const d = typeof date === 'string' ? parseISO(date) : date;
-  return startOfWeek(d, { weekStartsOn: 1 });
+  return startOfWeek(d, { weekStartsOn: 0 });
 }
 
 /**
- * Returns the Sunday of the week containing the given date.
+ * Returns the Saturday of the week containing the given date.
  */
 export function getWeekEnd(date: Date | string): Date {
   const d = typeof date === 'string' ? parseISO(date) : date;
-  return endOfWeek(d, { weekStartsOn: 1 });
+  return endOfWeek(d, { weekStartsOn: 0 });
 }
 
 /**
- * Returns an array of 7 Date objects for the week (Mon–Sun) containing the given date.
+ * Returns an array of 7 Date objects for the week (Sun–Sat) containing the given date.
  */
 export function getWeekDays(date: Date | string): Date[] {
   const start = getWeekStart(date);
@@ -52,7 +60,7 @@ export function getWeekDays(date: Date | string): Date[] {
 }
 
 /**
- * Returns the ISO week string "YYYY-MM-DD" for the Monday of the given date's week.
+ * Returns the ISO week string "YYYY-MM-DD" for the Sunday of the given date's week.
  */
 export function getWeekKey(date: Date | string): string {
   return format(getWeekStart(date), 'yyyy-MM-dd');
@@ -64,6 +72,76 @@ export function getWeekKey(date: Date | string): string {
 export function shiftWeek(weekStart: Date | string, n: number): Date {
   const d = typeof weekStart === 'string' ? parseISO(weekStart) : weekStart;
   return n >= 0 ? addWeeks(d, n) : subWeeks(d, Math.abs(n));
+}
+
+// ─── Month / Year Helpers ───────────────────────────────────────────────────
+
+/**
+ * Returns the 1st of the month containing the given date.
+ */
+export function getMonthStart(date: Date | string): Date {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return startOfMonth(d);
+}
+
+/**
+ * Returns every day shown on a Sun–Sat calendar grid for the month
+ * containing the given date (includes leading/trailing days from
+ * adjacent months so every row is a full week).
+ */
+export function getMonthGridDays(date: Date | string): Date[] {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  const gridStart = startOfWeek(startOfMonth(d), { weekStartsOn: 0 });
+  const gridEnd = endOfWeek(endOfMonth(d), { weekStartsOn: 0 });
+  return eachDayOfInterval({ start: gridStart, end: gridEnd });
+}
+
+/** Whether `date` falls within the same month as `monthStart`. */
+export function isInMonth(date: Date, monthStart: Date | string): boolean {
+  const m = typeof monthStart === 'string' ? parseISO(monthStart) : monthStart;
+  return isSameMonth(date, m);
+}
+
+/**
+ * Advances a month by n months (+/-).
+ */
+export function shiftMonth(monthStart: Date | string, n: number): Date {
+  const d = typeof monthStart === 'string' ? parseISO(monthStart) : monthStart;
+  return n >= 0 ? addMonths(d, n) : subMonths(d, Math.abs(n));
+}
+
+/**
+ * Returns the January 1st of the year containing the given date.
+ */
+export function getYearStart(date: Date | string): Date {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return startOfYear(d);
+}
+
+/** Returns the 1st of each of the 12 months in the year containing the given date. */
+export function getYearMonths(date: Date | string): Date[] {
+  const start = getYearStart(date);
+  return eachMonthOfInterval({ start, end: addMonths(start, 11) });
+}
+
+/**
+ * Advances a year by n years (+/-).
+ */
+export function shiftYear(yearStart: Date | string, n: number): Date {
+  const d = typeof yearStart === 'string' ? parseISO(yearStart) : yearStart;
+  return n >= 0 ? addYears(d, n) : subYears(d, Math.abs(n));
+}
+
+/** Formats a date as "July 2026" */
+export function formatMonthLabel(date: Date | string): string {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return format(d, 'MMMM yyyy');
+}
+
+/** Formats a date as "2026" */
+export function formatYearLabel(date: Date | string): string {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return format(d, 'yyyy');
 }
 
 // ─── Formatting ───────────────────────────────────────────────────────────────

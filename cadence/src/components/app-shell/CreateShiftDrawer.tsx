@@ -1,12 +1,17 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { X, Plus, ChevronDown } from 'lucide-react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { X, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@/store/ui.store';
 import { Avatar } from '@/components/common/Avatar';
+import { getEmployees, getLocations, getEmployeeById, ROLES, DEPARTMENTS } from '@/services/employees.service';
+import { createShift, updateShift, getShift } from '@/services/shifts.service';
+import type { CreateShiftInput } from '@/types';
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Assigned person (subset of Employee used for the chip UI) ───────────────
 
 interface AssignedPerson {
   id: string;
@@ -14,19 +19,6 @@ interface AssignedPerson {
   initials: string;
   color: string;
 }
-
-const MOCK_PEOPLE: AssignedPerson[] = [
-  { id: 'emp_001', name: 'Alex Mercer', initials: 'AM', color: '#5B7FD4' },
-];
-
-const ROLES = [
-  { id: 'role_1', name: 'Barista', color: '#5B7FD4' },
-  { id: 'role_2', name: 'Shift Lead', color: '#7C6AC4' },
-  { id: 'role_3', name: 'Cashier', color: '#5A9B6E' },
-];
-
-const DEPARTMENTS = ['Front of House', 'Kitchen', 'Management'];
-const LOCATIONS = ['Main St.', 'Downtown', 'Eastside'];
 
 const REPEAT_OPTIONS = ['Does not repeat', 'Daily', 'Weekly', 'Custom'];
 
@@ -36,12 +28,12 @@ interface ShiftForm {
   assignedPeople: AssignedPerson[];
   openShift: boolean;
   roleId: string;
-  department: string;
+  departmentId: string;
   date: string;
   startTime: string;
   endTime: string;
   breakMinutes: number;
-  location: string;
+  locationId: string;
   notes: string;
   repeat: string;
 }
@@ -56,28 +48,109 @@ function computeHours(start: string, end: string, breakMin: number): number {
 
 // ─── CreateShiftDrawer ────────────────────────────────────────────────────────
 
+const DEFAULT_FORM: ShiftForm = {
+  assignedPeople: [],
+  openShift: false,
+  roleId: ROLES[0].id,
+  departmentId: DEPARTMENTS[0].id,
+  date: new Date().toISOString().slice(0, 10),
+  startTime: '09:00',
+  endTime: '16:30',
+  breakMinutes: 30,
+  locationId: '',
+  notes: '',
+  repeat: REPEAT_OPTIONS[0],
+};
+
 export function CreateShiftDrawer() {
   const createShiftOpen = useUIStore((s) => s.createShiftOpen);
   const setCreateShiftOpen = useUIStore((s) => s.setCreateShiftOpen);
+  const editingShiftId = useUIStore((s) => s.editingShiftId);
+  const setEditingShiftId = useUIStore((s) => s.setEditingShiftId);
+  const createShiftDefaults = useUIStore((s) => s.createShiftDefaults);
+  const setCreateShiftDefaults = useUIStore((s) => s.setCreateShiftDefaults);
+  const queryClient = useQueryClient();
 
-  const close = useCallback(() => setCreateShiftOpen(false), [setCreateShiftOpen]);
+  const isEditing = !!editingShiftId;
 
-  const selectedRole = ROLES[0];
-  const HOURLY_RATE = 23;
+  const close = useCallback(() => {
+    setCreateShiftOpen(false);
+    setEditingShiftId(null);
+    setCreateShiftDefaults(null);
+  }, [setCreateShiftOpen, setEditingShiftId, setCreateShiftDefaults]);
 
-  const [form, setForm] = useState<ShiftForm>({
-    assignedPeople: [...MOCK_PEOPLE],
-    openShift: false,
-    roleId: ROLES[0].id,
-    department: DEPARTMENTS[0],
-    date: new Date().toISOString().slice(0, 10),
-    startTime: '09:00',
-    endTime: '16:30',
-    breakMinutes: 30,
-    location: LOCATIONS[0],
-    notes: '',
-    repeat: REPEAT_OPTIONS[0],
+  const [form, setForm] = useState<ShiftForm>(DEFAULT_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const { data: employees } = useQuery({ queryKey: ['employees'], queryFn: () => getEmployees() });
+  const { data: locations } = useQuery({ queryKey: ['locations'], queryFn: () => getLocations() });
+  const { data: editingShift } = useQuery({
+    queryKey: ['shift', editingShiftId],
+    queryFn: () => getShift(editingShiftId!),
+    enabled: !!editingShiftId,
   });
+
+  // Default location (create mode only) — derived at render time, no state needed
+  const defaultLocationId =
+    !isEditing && locations && locations.length > 0
+      ? (locations[0].locationId ?? locations[0].id)
+      : '';
+  const effectiveLocationId = form.locationId || defaultLocationId;
+
+  // Reset the form each time the drawer opens fresh (create mode), applying any prefill
+  useEffect(() => {
+    if (!createShiftOpen || editingShiftId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reinitializing local form state when the drawer's open/edit target changes
+    setForm({
+      ...DEFAULT_FORM,
+      date: createShiftDefaults?.date ?? DEFAULT_FORM.date,
+      openShift: createShiftDefaults?.openShift ?? DEFAULT_FORM.openShift,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when the drawer (re)opens fresh, not on every defaults change
+  }, [createShiftOpen, editingShiftId]);
+
+  // Pre-fill the assigned person once employees have loaded, if a prefill employee was requested
+  useEffect(() => {
+    if (!createShiftOpen || editingShiftId || !createShiftDefaults?.employeeId || !employees) return;
+    const emp = employees.find((e) => e.id === createShiftDefaults.employeeId);
+    if (!emp) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-filling the assigned person once the employees query resolves
+    setForm((f) =>
+      f.assignedPeople.some((p) => p.id === emp.id)
+        ? f
+        : {
+            ...f,
+            openShift: false,
+            assignedPeople: [
+              ...f.assignedPeople,
+              { id: emp.id, name: emp.name, initials: emp.initials, color: emp.avatarColor },
+            ],
+          }
+    );
+  }, [createShiftOpen, editingShiftId, createShiftDefaults, employees]);
+
+  // Populate the form from the shift being edited once it loads
+  useEffect(() => {
+    if (!editingShift) return;
+    const emp = editingShift.employeeId ? getEmployeeById(editingShift.employeeId) : undefined;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-filling the form once the async shift-to-edit query resolves
+    setForm({
+      assignedPeople: emp
+        ? [{ id: emp.id, name: emp.name, initials: emp.initials, color: emp.avatarColor }]
+        : [],
+      openShift: !editingShift.employeeId,
+      roleId: editingShift.roleId,
+      departmentId: editingShift.departmentId,
+      date: editingShift.date,
+      startTime: editingShift.startTime,
+      endTime: editingShift.endTime,
+      breakMinutes: editingShift.breakMinutes,
+      locationId: editingShift.locationId,
+      notes: editingShift.notes ?? '',
+      repeat: REPEAT_OPTIONS[0],
+    });
+  }, [editingShift]);
 
   // Close on Escape
   useEffect(() => {
@@ -90,13 +163,112 @@ export function CreateShiftDrawer() {
   }, [createShiftOpen, close]);
 
   const hours = computeHours(form.startTime, form.endTime, form.breakMinutes);
-  const estimatedCost = Math.round(hours * HOURLY_RATE);
+  const assignedEmployees = useMemo(
+    () =>
+      form.assignedPeople
+        .map((p) => employees?.find((e) => e.id === p.id))
+        .filter((e): e is NonNullable<typeof e> => !!e),
+    [form.assignedPeople, employees]
+  );
+  const totalEstimatedCost = assignedEmployees.reduce(
+    (sum, e) => sum + hours * (e.hourlyRate ?? 0),
+    0
+  );
 
   const removePerson = (id: string) => {
     setForm((f) => ({ ...f, assignedPeople: f.assignedPeople.filter((p) => p.id !== id) }));
   };
 
+  const addPerson = (emp: NonNullable<typeof employees>[number]) => {
+    const person = { id: emp.id, name: emp.name, initials: emp.initials, color: emp.avatarColor };
+    setForm((f) => {
+      if (isEditing) return { ...f, assignedPeople: [person], openShift: false };
+      if (f.assignedPeople.some((p) => p.id === emp.id)) return f;
+      return { ...f, assignedPeople: [...f.assignedPeople, person] };
+    });
+    setPickerOpen(false);
+  };
+
+  const availableEmployees = useMemo(
+    () => (employees ?? []).filter((e) => !form.assignedPeople.some((p) => p.id === e.id)),
+    [employees, form.assignedPeople]
+  );
+
+  async function handleSubmit(publish: boolean) {
+    if (!effectiveLocationId) {
+      toast.error('Select a location first');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const base: Omit<CreateShiftInput, 'employeeId'> = {
+        date: form.date,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        breakMinutes: form.breakMinutes,
+        roleId: form.roleId,
+        departmentId: form.departmentId,
+        locationId: effectiveLocationId,
+        notes: form.notes || undefined,
+      };
+
+      const targets: (string | null)[] =
+        form.openShift || form.assignedPeople.length === 0
+          ? [null]
+          : form.assignedPeople.map((p) => p.id);
+
+      const created = await Promise.all(
+        targets.map((employeeId) => createShift({ ...base, employeeId }))
+      );
+
+      if (publish) {
+        await Promise.all(
+          created
+            .filter((s) => s.employeeId)
+            .map((s) => updateShift(s.id, { status: 'filled', publishedAt: new Date().toISOString() }))
+        );
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast.success(publish ? 'Shift published successfully' : 'Shift saved as draft');
+      close();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save shift');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editingShiftId || !effectiveLocationId) return;
+    setSubmitting(true);
+    try {
+      const employeeId = form.openShift ? null : (form.assignedPeople[0]?.id ?? null);
+      await updateShift(editingShiftId, {
+        employeeId,
+        date: form.date,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        breakMinutes: form.breakMinutes,
+        roleId: form.roleId,
+        departmentId: form.departmentId,
+        locationId: effectiveLocationId,
+        notes: form.notes || undefined,
+        status: employeeId ? 'filled' : 'open',
+      });
+      await queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      await queryClient.invalidateQueries({ queryKey: ['shift', editingShiftId] });
+      toast.success('Shift updated');
+      close();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update shift');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const currentRole = ROLES.find((r) => r.id === form.roleId) ?? ROLES[0];
+  const currentDepartment = DEPARTMENTS.find((d) => d.id === currentRole.departmentId);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -175,7 +347,7 @@ export function CreateShiftDrawer() {
               }}
             >
               <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>
-                Create shift
+                {isEditing ? 'Edit shift' : 'Create shift'}
               </h2>
               <button
                 onClick={close}
@@ -243,26 +415,77 @@ export function CreateShiftDrawer() {
                     </div>
                   ))}
 
-                  {/* Add person chip */}
-                  <button
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 5,
-                      height: 30,
-                      paddingInline: 10,
-                      borderRadius: 99,
-                      border: '1.5px dashed var(--border-strong)',
-                      background: 'transparent',
-                      color: 'var(--text-muted)',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Plus size={12} />
-                    Add person
-                  </button>
+                  {/* Add person chip + picker */}
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setPickerOpen((v) => !v)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        height: 30,
+                        paddingInline: 10,
+                        borderRadius: 99,
+                        border: '1.5px dashed var(--border-strong)',
+                        background: 'transparent',
+                        color: 'var(--text-muted)',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Plus size={12} />
+                      Add person
+                    </button>
+                    {pickerOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 34,
+                          left: 0,
+                          zIndex: 50,
+                          minWidth: 200,
+                          maxHeight: 220,
+                          overflowY: 'auto',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          boxShadow: 'var(--shadow-lg)',
+                          padding: 4,
+                        }}
+                      >
+                        {availableEmployees.length === 0 ? (
+                          <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-dim)' }}>
+                            No more employees to add
+                          </div>
+                        ) : (
+                          availableEmployees.map((emp) => (
+                            <button
+                              key={emp.id}
+                              onClick={() => addPerson(emp)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                width: '100%',
+                                padding: '6px 8px',
+                                borderRadius: 6,
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                                color: 'var(--text)',
+                                textAlign: 'left',
+                              }}
+                            >
+                              <Avatar initials={emp.initials} color={emp.avatarColor} size={20} />
+                              {emp.name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Open shift chip */}
                   <button
@@ -310,7 +533,7 @@ export function CreateShiftDrawer() {
                         width: 8,
                         height: 8,
                         borderRadius: '50%',
-                        background: currentRole.color,
+                        background: currentDepartment?.color ?? 'var(--text-dim)',
                       }}
                     />
                     <select
@@ -329,12 +552,14 @@ export function CreateShiftDrawer() {
                 <div>
                   <label style={labelStyle}>Department</label>
                   <select
-                    value={form.department}
-                    onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
+                    value={form.departmentId}
+                    onChange={(e) => setForm((f) => ({ ...f, departmentId: e.target.value }))}
                     style={inputStyle}
                   >
                     {DEPARTMENTS.map((d) => (
-                      <option key={d}>{d}</option>
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -354,8 +579,9 @@ export function CreateShiftDrawer() {
                   <input
                     type="date"
                     value={form.date}
+                    disabled={isEditing}
                     onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                    style={inputStyle}
+                    style={{ ...inputStyle, opacity: isEditing ? 0.6 : 1 }}
                   />
                 </div>
                 <div>
@@ -392,14 +618,22 @@ export function CreateShiftDrawer() {
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Location</label>
                   <select
-                    value={form.location}
-                    onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                    style={inputStyle}
+                    value={effectiveLocationId}
+                    disabled={isEditing}
+                    onChange={(e) => setForm((f) => ({ ...f, locationId: e.target.value }))}
+                    style={{ ...inputStyle, opacity: isEditing ? 0.6 : 1 }}
                   >
-                    {LOCATIONS.map((l) => (
-                      <option key={l}>{l}</option>
+                    {(locations ?? []).map((l) => (
+                      <option key={l.id} value={l.locationId ?? l.id}>
+                        {l.name}
+                      </option>
                     ))}
                   </select>
+                  {isEditing && (
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                      Date &amp; location can&apos;t be changed after creation — delete and recreate instead.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -416,12 +650,27 @@ export function CreateShiftDrawer() {
               >
                 <span style={{ color: 'var(--text)', fontWeight: 600 }}>
                   {hours.toFixed(1)}h shift
+                  {assignedEmployees.length > 1 ? ` × ${assignedEmployees.length} people` : ''}
                 </span>
-                {' · '}estimated{' '}
-                <span style={{ color: 'var(--text)', fontWeight: 600 }}>
-                  ${estimatedCost}
-                </span>{' '}
-                at ${HOURLY_RATE}/h
+                {assignedEmployees.length === 0 ? (
+                  <> · assign a person to estimate pay</>
+                ) : assignedEmployees.length === 1 ? (
+                  <>
+                    {' · estimated '}
+                    <span style={{ color: 'var(--text)', fontWeight: 600 }}>
+                      ${totalEstimatedCost.toFixed(2)}
+                    </span>{' '}
+                    at ${(assignedEmployees[0].hourlyRate ?? 0).toFixed(2)}/h
+                  </>
+                ) : (
+                  <>
+                    {' · estimated total '}
+                    <span style={{ color: 'var(--text)', fontWeight: 600 }}>
+                      ${totalEstimatedCost.toFixed(2)}
+                    </span>{' '}
+                    across {assignedEmployees.length} people
+                  </>
+                )}
               </div>
 
               {/* ── Section 5: Notes ── */}
@@ -480,36 +729,65 @@ export function CreateShiftDrawer() {
                 flexShrink: 0,
               }}
             >
-              <button
-                style={{
-                  flex: 1,
-                  height: 36,
-                  borderRadius: 8,
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface-2)',
-                  color: 'var(--text)',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
-              >
-                Save as draft
-              </button>
-              <button
-                style={{
-                  flex: 1,
-                  height: 36,
-                  borderRadius: 8,
-                  border: 'none',
-                  background: 'var(--accent)',
-                  color: '#FFFFFF',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Publish shift
-              </button>
+              {isEditing ? (
+                <button
+                  disabled={submitting}
+                  onClick={handleSaveEdit}
+                  style={{
+                    flex: 1,
+                    height: 36,
+                    borderRadius: 8,
+                    border: 'none',
+                    background: 'var(--accent)',
+                    color: '#FFFFFF',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: submitting ? 'default' : 'pointer',
+                    opacity: submitting ? 0.6 : 1,
+                  }}
+                >
+                  {submitting ? 'Saving…' : 'Save changes'}
+                </button>
+              ) : (
+                <>
+                  <button
+                    disabled={submitting}
+                    onClick={() => handleSubmit(false)}
+                    style={{
+                      flex: 1,
+                      height: 36,
+                      borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface-2)',
+                      color: 'var(--text)',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: submitting ? 'default' : 'pointer',
+                      opacity: submitting ? 0.6 : 1,
+                    }}
+                  >
+                    Save as draft
+                  </button>
+                  <button
+                    disabled={submitting}
+                    onClick={() => handleSubmit(true)}
+                    style={{
+                      flex: 1,
+                      height: 36,
+                      borderRadius: 8,
+                      border: 'none',
+                      background: 'var(--accent)',
+                      color: '#FFFFFF',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: submitting ? 'default' : 'pointer',
+                      opacity: submitting ? 0.6 : 1,
+                    }}
+                  >
+                    {submitting ? 'Saving…' : 'Publish shift'}
+                  </button>
+                </>
+              )}
             </div>
           </motion.aside>
         </>

@@ -4,15 +4,15 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { getShifts } from '@/services/shifts.service';
-import { getEmployees, getRoleById, getDepartmentById } from '@/services/employees.service';
+import { getEmployees, getRoleById } from '@/services/employees.service';
 import { useUIStore } from '@/store/ui.store';
-import { getWeekDays, formatISODate } from '@/lib/date';
-import { parseISO, format } from 'date-fns';
-import type { Shift, Employee } from '@/types';
+import { formatISODate, today } from '@/lib/date';
+import { netHours, formatMoney } from '@/lib/payroll';
+import { format } from 'date-fns';
+import { ScheduleErrorState } from './ScheduleErrorState';
+import type { Shift, ShiftStatus } from '@/types';
 
 // ─── Status config ────────────────────────────────────────────────────────────
-
-type ShiftStatus = 'filled' | 'open' | 'conflict' | 'draft';
 
 const STATUS_VARS = {
   filled: {
@@ -150,21 +150,26 @@ function OpenShiftCard({ shift, onClick }: { shift: Shift; onClick: () => void }
 
 // ─── Empty Cell ───────────────────────────────────────────────────────────────
 
-function EmptyCell() {
+function EmptyCell({ onClick }: { onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <div
+    <button
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      aria-label="Add shift"
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        width: '100%',
         height: 'var(--shift-h)',
         borderRadius: 'var(--radius-sm)',
         border: hovered ? '1px dashed var(--border-strong)' : '1px dashed transparent',
-        cursor: hovered ? 'pointer' : 'default',
+        background: 'transparent',
+        padding: 0,
+        cursor: 'pointer',
         transition: 'border 0.1s ease',
       }}
     >
@@ -176,7 +181,7 @@ function EmptyCell() {
           transition: 'opacity 0.1s ease',
         }}
       />
-    </div>
+    </button>
   );
 }
 
@@ -222,14 +227,20 @@ function DayHeader({ date, isToday }: { date: Date; isToday: boolean }) {
 
 // ─── Legend Bar ───────────────────────────────────────────────────────────────
 
-const LEGEND_ITEMS = [
-  { label: 'Filled', count: 47, color: 'var(--filled-dot)' },
-  { label: 'Open', count: 3, color: 'var(--open-dot)' },
-  { label: 'Conflict', count: 1, color: 'var(--conflict-dot)' },
-  { label: 'Draft', count: 3, color: 'var(--draft-dot)' },
+const STATUS_LEGEND: { key: ShiftStatus; label: string; dot: string }[] = [
+  { key: 'filled', label: 'Filled', dot: 'var(--filled-dot)' },
+  { key: 'open', label: 'Open', dot: 'var(--open-dot)' },
+  { key: 'conflict', label: 'Conflict', dot: 'var(--conflict-dot)' },
+  { key: 'draft', label: 'Draft', dot: 'var(--draft-dot)' },
 ];
 
-function LegendBar() {
+function LegendBar({
+  statusCounts,
+  totalPayroll,
+}: {
+  statusCounts: Record<ShiftStatus, number>;
+  totalPayroll: number;
+}) {
   return (
     <div
       style={{
@@ -243,14 +254,14 @@ function LegendBar() {
         gap: 16,
       }}
     >
-      {LEGEND_ITEMS.map((item) => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      {STATUS_LEGEND.map((item) => (
+        <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span
             style={{
               width: 8,
               height: 8,
               borderRadius: 2,
-              background: item.color,
+              background: item.dot,
               flexShrink: 0,
             }}
           />
@@ -261,7 +272,8 @@ function LegendBar() {
               fontFamily: 'var(--font-mono)',
             }}
           >
-            {item.label} · <strong style={{ color: 'var(--text)' }}>{item.count}</strong>
+            {item.label} ·{' '}
+            <strong style={{ color: 'var(--text)' }}>{statusCounts[item.key] ?? 0}</strong>
           </span>
         </div>
       ))}
@@ -270,12 +282,13 @@ function LegendBar() {
 
       <span
         style={{
-          fontSize: 11,
-          color: 'var(--text-dim)',
+          fontSize: 12,
+          color: 'var(--text)',
           fontFamily: 'var(--font-mono)',
+          fontWeight: 600,
         }}
       >
-        Last saved 2 min ago · ⌘Z undo
+        Total payroll · {formatMoney(totalPayroll)}
       </span>
     </div>
   );
@@ -284,21 +297,29 @@ function LegendBar() {
 // ─── Week Grid ────────────────────────────────────────────────────────────────
 
 interface WeekGridProps {
-  weekStart: string;
+  /** The days to render as columns, left to right. */
+  days: Date[];
+  departmentId?: string | null;
 }
 
-export function WeekGrid({ weekStart }: WeekGridProps) {
+export function WeekGrid({ days, departmentId }: WeekGridProps) {
   const setSelectedShiftId = useUIStore((s) => s.setSelectedShiftId);
+  const setCreateShiftOpen = useUIStore((s) => s.setCreateShiftOpen);
+  const setCreateShiftDefaults = useUIStore((s) => s.setCreateShiftDefaults);
 
-  const weekDays = useMemo(() => getWeekDays(weekStart), [weekStart]);
-  const todayStr = '2026-06-28'; // last day of the seeded week (Sunday Jun 28)
+  const weekDays = days;
+  const todayStr = today();
 
-  const { data: shifts, isLoading: shiftsLoading } = useQuery({
-    queryKey: ['shifts', weekStart],
-    queryFn: () => getShifts({ weekStart }),
+  const dateFrom = formatISODate(weekDays[0]);
+  const dateTo = formatISODate(weekDays[weekDays.length - 1]);
+
+  const { data: shifts, isLoading: shiftsLoading, isError: shiftsError, error: shiftsErrorObj } = useQuery({
+    queryKey: ['shifts', dateFrom, dateTo, departmentId ?? null],
+    queryFn: () =>
+      getShifts({ dateRange: { start: dateFrom, end: dateTo }, departmentId: departmentId ?? undefined }),
   });
 
-  const { data: employees, isLoading: empLoading } = useQuery({
+  const { data: employees, isLoading: empLoading, isError: empError, error: empErrorObj } = useQuery({
     queryKey: ['employees'],
     queryFn: () => getEmployees(),
   });
@@ -329,31 +350,50 @@ export function WeekGrid({ weekStart }: WeekGridProps) {
     return map;
   }, [shifts]);
 
-  // Compute weekly hours per employee
-  const weeklyHours = useMemo(() => {
-    if (!shifts) return new Map<string, number>();
-    const map = new Map<string, number>();
-    for (const shift of shifts) {
+  const rateByEmployeeId = useMemo(
+    () => new Map((employees ?? []).map((e) => [e.id, e.hourlyRate ?? 0])),
+    [employees]
+  );
+
+  // Compute hours worked + labor cost per employee for the visible range
+  const employeeStats = useMemo(() => {
+    const map = new Map<string, { hours: number; cost: number }>();
+    for (const shift of shifts ?? []) {
       if (!shift.employeeId) continue;
-      const [sh, sm] = shift.startTime.split(':').map(Number);
-      const [eh, em] = shift.endTime.split(':').map(Number);
-      let mins = eh * 60 + em - (sh * 60 + sm);
-      if (mins < 0) mins += 24 * 60;
-      const net = Math.max(0, mins - shift.breakMinutes) / 60;
-      map.set(shift.employeeId, (map.get(shift.employeeId) ?? 0) + net);
+      const hours = netHours(shift);
+      const cost = hours * (rateByEmployeeId.get(shift.employeeId) ?? 0);
+      const prev = map.get(shift.employeeId) ?? { hours: 0, cost: 0 };
+      map.set(shift.employeeId, { hours: prev.hours + hours, cost: prev.cost + cost });
     }
     return map;
-  }, [shifts]);
+  }, [shifts, rateByEmployeeId]);
+
+  // Status counts + total labor cost across the visible range (legend / summary bar)
+  const { statusCounts, totalPayroll } = useMemo(() => {
+    const counts: Record<ShiftStatus, number> = { filled: 0, open: 0, conflict: 0, draft: 0 };
+    let payroll = 0;
+    for (const shift of shifts ?? []) {
+      const status = (shift.status as ShiftStatus) ?? 'draft';
+      counts[status] = (counts[status] ?? 0) + 1;
+      if (shift.employeeId) {
+        payroll += netHours(shift) * (rateByEmployeeId.get(shift.employeeId) ?? 0);
+      }
+    }
+    return { statusCounts: counts, totalPayroll: payroll };
+  }, [shifts, rateByEmployeeId]);
 
   const isLoading = shiftsLoading || empLoading;
 
   const activeEmployees = useMemo(
-    () => (employees ?? []).filter((e) => e.status !== 'inactive'),
-    [employees]
+    () =>
+      (employees ?? []).filter(
+        (e) => e.status !== 'inactive' && (!departmentId || e.departmentId === departmentId)
+      ),
+    [employees, departmentId]
   );
 
   const PERSON_COL = 240;
-  const GRID_COLS = `${PERSON_COL}px repeat(7, minmax(100px, 1fr))`;
+  const GRID_COLS = `${PERSON_COL}px repeat(${weekDays.length}, minmax(100px, 1fr))`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -372,12 +412,14 @@ export function WeekGrid({ weekStart }: WeekGridProps) {
           >
             Loading schedule…
           </div>
+        ) : shiftsError || empError ? (
+          <ScheduleErrorState error={shiftsErrorObj ?? empErrorObj} />
         ) : (
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: GRID_COLS,
-              minWidth: PERSON_COL + 7 * 100,
+              minWidth: PERSON_COL + weekDays.length * 100,
             }}
           >
             {/* ── Sticky header row ── */}
@@ -424,8 +466,9 @@ export function WeekGrid({ weekStart }: WeekGridProps) {
             {/* ── Employee rows ── */}
             {activeEmployees.map((emp) => {
               const role = getRoleById(emp.roleId);
-              const dept = getDepartmentById(emp.departmentId);
-              const hours = weeklyHours.get(emp.id) ?? 0;
+              const stats = employeeStats.get(emp.id);
+              const hours = stats?.hours ?? 0;
+              const cost = stats?.cost ?? 0;
 
               return (
                 <div key={emp.id} style={{ display: 'contents' }}>
@@ -488,7 +531,7 @@ export function WeekGrid({ weekStart }: WeekGridProps) {
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {role?.name ?? emp.roleId} · {hours.toFixed(1)}h
+                        {role?.name ?? emp.roleId} · {hours.toFixed(1)}h · {formatMoney(cost)}
                       </div>
                     </div>
                   </div>
@@ -521,7 +564,12 @@ export function WeekGrid({ weekStart }: WeekGridProps) {
                             />
                           ))
                         ) : (
-                          <EmptyCell />
+                          <EmptyCell
+                            onClick={() => {
+                              setCreateShiftDefaults({ employeeId: emp.id, date: dateStr });
+                              setCreateShiftOpen(true);
+                            }}
+                          />
                         )}
                       </div>
                     );
@@ -606,7 +654,14 @@ export function WeekGrid({ weekStart }: WeekGridProps) {
                               onClick={() => setSelectedShiftId(shift.id)}
                             />
                           ))
-                        : <EmptyCell />}
+                        : (
+                          <EmptyCell
+                            onClick={() => {
+                              setCreateShiftDefaults({ date: dateStr, openShift: true });
+                              setCreateShiftOpen(true);
+                            }}
+                          />
+                        )}
                     </div>
                   );
                 })}
@@ -617,7 +672,7 @@ export function WeekGrid({ weekStart }: WeekGridProps) {
       </div>
 
       {/* ── Legend bar (sticky bottom) ── */}
-      <LegendBar />
+      <LegendBar statusCounts={statusCounts} totalPayroll={totalPayroll} />
     </div>
   );
 }

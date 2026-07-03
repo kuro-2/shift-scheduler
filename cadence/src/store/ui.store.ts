@@ -15,6 +15,9 @@ interface UIState {
   createShiftOpen: boolean;
   notificationsOpen: boolean;
   selectedShiftId: string | null;
+  editingShiftId: string | null;
+  /** Pre-fill values applied the next time the create-shift drawer opens fresh. */
+  createShiftDefaults: { employeeId?: string; date?: string; openShift?: boolean } | null;
 
   // ── Actions ──
   setTheme: (theme: Theme) => void;
@@ -27,6 +30,8 @@ interface UIState {
   setCreateShiftOpen: (open: boolean) => void;
   setNotificationsOpen: (open: boolean) => void;
   setSelectedShiftId: (id: string | null) => void;
+  setEditingShiftId: (id: string | null) => void;
+  setCreateShiftDefaults: (defaults: UIState['createShiftDefaults']) => void;
 }
 
 // ─── DOM Helpers ──────────────────────────────────────────────────────────────
@@ -56,6 +61,8 @@ export const useUIStore = create<UIState>()(
       createShiftOpen: false,
       notificationsOpen: false,
       selectedShiftId: null,
+      editingShiftId: null,
+      createShiftDefaults: null,
 
       // ── Theme Actions ──
       setTheme: (theme) => {
@@ -90,9 +97,11 @@ export const useUIStore = create<UIState>()(
       setCreateShiftOpen: (open) => set({ createShiftOpen: open }),
       setNotificationsOpen: (open) => set({ notificationsOpen: open }),
       setSelectedShiftId: (id) => set({ selectedShiftId: id }),
+      setEditingShiftId: (id) => set({ editingShiftId: id }),
+      setCreateShiftDefaults: (defaults) => set({ createShiftDefaults: defaults }),
     }),
     {
-      name: 'cadence-ui',
+      name: 'nexora-ui',
       storage: createJSONStorage(() =>
         typeof window !== 'undefined' ? localStorage : createNoopStorage()
       ),

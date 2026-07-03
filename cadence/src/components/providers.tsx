@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { useUIStore } from '@/store/ui.store';
+import { SessionGate } from '@/components/SessionGate';
 
 // ─── QueryClient singleton ────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydration-safe mount flag
     setMounted(true);
   }, []);
 
@@ -70,7 +72,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        {children}
+        <SessionGate>
+          {children}
+        </SessionGate>
         <Toaster
           position="bottom-right"
           toastOptions={{

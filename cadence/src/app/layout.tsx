@@ -21,18 +21,18 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Cadence — Shift Scheduling',
-    template: '%s · Cadence',
+    default: 'Nexora — Shift Scheduling',
+    template: '%s · Nexora',
   },
   description:
-    'Cadence is a modern shift-scheduling platform for teams. Manage schedules, track attendance, handle time-off, and stay in sync — all in one place.',
-  keywords: ['shift scheduling', 'workforce management', 'employee scheduling', 'cadence'],
-  authors: [{ name: 'Cadence' }],
-  metadataBase: new URL('https://cadence.app'),
+    'Nexora is a modern shift-scheduling platform for teams. Manage schedules, track attendance, handle time-off, and stay in sync — all in one place.',
+  keywords: ['shift scheduling', 'workforce management', 'employee scheduling', 'nexora'],
+  authors: [{ name: 'Nexora' }],
+  metadataBase: new URL('https://nexora.app'),
   openGraph: {
     type: 'website',
-    siteName: 'Cadence',
-    title: 'Cadence — Shift Scheduling',
+    siteName: 'Nexora',
+    title: 'Nexora — Shift Scheduling',
     description: 'Modern shift scheduling for modern teams.',
   },
   robots: {

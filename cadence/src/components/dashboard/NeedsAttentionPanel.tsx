@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { AlertTriangle, CalendarX, ArrowLeftRight, Clock } from 'lucide-react';
 
 interface AttentionItem {
@@ -9,6 +10,7 @@ interface AttentionItem {
   title: string;
   sub: string;
   action: string;
+  href: string;
 }
 
 const ITEMS: AttentionItem[] = [
@@ -19,6 +21,7 @@ const ITEMS: AttentionItem[] = [
     title: 'Scheduling conflict · Tuesday',
     sub: 'Jordan Park is double-booked 9:00–17:30',
     action: 'Resolve',
+    href: '/schedule',
   },
   {
     id: 'open-shifts',
@@ -27,6 +30,7 @@ const ITEMS: AttentionItem[] = [
     title: '3 open shifts this week',
     sub: 'Tue · Wed · Sat still need coverage',
     action: 'Assign',
+    href: '/schedule',
   },
   {
     id: 'swaps',
@@ -35,6 +39,7 @@ const ITEMS: AttentionItem[] = [
     title: '2 shift swap requests pending',
     sub: 'Naomi ↔ Devon · Riley ↔ Sam',
     action: 'Review',
+    href: '/time-off',
   },
   {
     id: 'time-off',
@@ -43,6 +48,7 @@ const ITEMS: AttentionItem[] = [
     title: '4 time-off requests waiting',
     sub: 'Oldest from Marcus Chen, submitted 3 days ago',
     action: 'Review',
+    href: '/time-off',
   },
 ];
 
@@ -54,6 +60,8 @@ const ICON_TEXT: Record<string, string> = {
 };
 
 export function NeedsAttentionPanel() {
+  const router = useRouter();
+
   return (
     <div
       style={{
@@ -90,6 +98,7 @@ export function NeedsAttentionPanel() {
         </span>
         <span style={{ flex: 1 }} />
         <button
+          onClick={() => router.push('/schedule')}
           style={{
             background: 'none',
             border: 'none',
@@ -143,6 +152,7 @@ export function NeedsAttentionPanel() {
 
             {/* Action button */}
             <button
+              onClick={() => router.push(item.href)}
               style={{
                 flexShrink: 0,
                 fontSize: 12,

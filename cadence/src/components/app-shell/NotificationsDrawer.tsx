@@ -167,6 +167,7 @@ export function NotificationsDrawer() {
   // Fetch notifications when drawer opens
   useEffect(() => {
     if (!notificationsOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- kicking off an async fetch triggered by drawer open
     setLoading(true);
     getNotifications().then((data) => {
       setNotifications(data);
@@ -235,7 +236,7 @@ export function NotificationsDrawer() {
               top: 0,
               right: 0,
               bottom: 0,
-              width: 400,
+              width: 'min(400px, 100vw)',
               background: 'var(--surface)',
               borderLeft: '1px solid var(--border)',
               boxShadow: 'var(--shadow-lg)',

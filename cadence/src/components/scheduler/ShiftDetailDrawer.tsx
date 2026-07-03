@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Edit2, Copy, Trash2, Mail, Clock, Coffee, MapPin, DollarSign } from 'lucide-react';
-import { getShift } from '@/services/shifts.service';
+import { toast } from 'sonner';
+import { getShift, createShift, deleteShift } from '@/services/shifts.service';
 import {
   getEmployeeById,
   getRoleById,
@@ -17,12 +18,50 @@ import type { ShiftStatus } from '@/types';
 export function ShiftDetailDrawer() {
   const selectedShiftId = useUIStore((s) => s.selectedShiftId);
   const setSelectedShiftId = useUIStore((s) => s.setSelectedShiftId);
+  const setCreateShiftOpen = useUIStore((s) => s.setCreateShiftOpen);
+  const setEditingShiftId = useUIStore((s) => s.setEditingShiftId);
+  const queryClient = useQueryClient();
 
   const { data: shift, isLoading } = useQuery({
     queryKey: ['shift', selectedShiftId],
     queryFn: () => getShift(selectedShiftId!),
     enabled: !!selectedShiftId,
   });
+
+  async function handleDuplicate() {
+    if (!shift) return;
+    try {
+      await createShift({
+        employeeId: shift.employeeId,
+        date: shift.date,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        breakMinutes: shift.breakMinutes,
+        roleId: shift.roleId,
+        departmentId: shift.departmentId,
+        locationId: shift.locationId,
+        notes: shift.notes,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast.success('Shift duplicated');
+      setSelectedShiftId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to duplicate shift');
+    }
+  }
+
+  async function handleDelete() {
+    if (!shift) return;
+    if (!window.confirm('Delete this shift? This cannot be undone.')) return;
+    try {
+      await deleteShift(shift.id);
+      await queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast.success('Shift deleted');
+      setSelectedShiftId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete shift');
+    }
+  }
 
   if (!selectedShiftId) return null;
 
@@ -201,6 +240,7 @@ export function ShiftDetailDrawer() {
                       </div>
                     </div>
                     <button
+                      onClick={() => toast.info('Messaging is coming soon')}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -312,6 +352,11 @@ export function ShiftDetailDrawer() {
               }}
             >
               <button
+                onClick={() => {
+                  setEditingShiftId(shift.id);
+                  setSelectedShiftId(null);
+                  setCreateShiftOpen(true);
+                }}
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -332,6 +377,7 @@ export function ShiftDetailDrawer() {
                 Edit
               </button>
               <button
+                onClick={handleDuplicate}
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -352,6 +398,7 @@ export function ShiftDetailDrawer() {
                 Duplicate
               </button>
               <button
+                onClick={handleDelete}
                 style={{
                   width: 38,
                   display: 'flex',

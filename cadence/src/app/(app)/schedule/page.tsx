@@ -1,15 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScheduleToolbar } from '@/components/scheduler/ScheduleToolbar';
 import { WeekGrid } from '@/components/scheduler/WeekGrid';
+import { MonthGrid } from '@/components/scheduler/MonthGrid';
+import { YearGrid } from '@/components/scheduler/YearGrid';
 import { ShiftDetailDrawer } from '@/components/scheduler/ShiftDetailDrawer';
-
-type ViewMode = 'day' | 'week' | 'month' | 'timeline';
+import { today, getWeekDays, parseISO } from '@/lib/date';
+import type { ScheduleViewMode } from '@/types';
 
 export default function SchedulePage() {
-  const [weekStart, setWeekStart] = useState('2026-06-22');
-  const [view, setView] = useState<ViewMode>('week');
+  const [anchorDate, setAnchorDate] = useState(today);
+  const [view, setView] = useState<ScheduleViewMode>('week');
+  const [departmentId, setDepartmentId] = useState<string | null>(null);
+
+  const days = useMemo(
+    () => (view === 'day' ? [parseISO(anchorDate)] : getWeekDays(anchorDate)),
+    [view, anchorDate]
+  );
+
+  function selectDay(dateStr: string) {
+    setAnchorDate(dateStr);
+    setView('day');
+  }
+
+  function selectMonth(dateStr: string) {
+    setAnchorDate(dateStr);
+    setView('month');
+  }
 
   return (
     <div
@@ -21,12 +39,20 @@ export default function SchedulePage() {
       }}
     >
       <ScheduleToolbar
-        weekStart={weekStart}
-        setWeekStart={setWeekStart}
+        anchorDate={anchorDate}
+        setAnchorDate={setAnchorDate}
         view={view}
         setView={setView}
+        departmentId={departmentId}
+        setDepartmentId={setDepartmentId}
       />
-      <WeekGrid weekStart={weekStart} />
+      {view === 'month' ? (
+        <MonthGrid anchorDate={anchorDate} departmentId={departmentId} onSelectDay={selectDay} />
+      ) : view === 'year' ? (
+        <YearGrid anchorDate={anchorDate} departmentId={departmentId} onSelectMonth={selectMonth} />
+      ) : (
+        <WeekGrid days={days} departmentId={departmentId} />
+      )}
       <ShiftDetailDrawer />
     </div>
   );

@@ -15,7 +15,6 @@ import {
   Plus,
   Sun,
   Rows3,
-  X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useUIStore } from '@/store/ui.store';

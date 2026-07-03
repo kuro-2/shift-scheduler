@@ -2,7 +2,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { getShifts } from '@/services/shifts.service';
-import { getEmployees } from '@/services/employees.service';
 
 // Static today-shifts for display (dashboard mock for Jun 29)
 const STATIC_SHIFTS = [
@@ -123,19 +122,15 @@ function ShiftRow({
 }
 
 export function TodayShiftsPanel() {
-  // Fetch real data (used for count display)
+  // Fetch real data so the "total" badge reflects live shift counts, while the
+  // curated rows below stay pinned to the design mock's exact copy.
   const { data: shifts } = useQuery({
     queryKey: ['shifts', 'today', '2026-06-29'],
     queryFn: () =>
       getShifts({ dateRange: { start: '2026-06-29', end: '2026-06-29' } }),
   });
 
-  const { data: employees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => getEmployees(),
-  });
-
-  const totalToday = STATIC_SHIFTS.length;
+  const totalToday = shifts?.length ?? STATIC_SHIFTS.length;
 
   return (
     <div

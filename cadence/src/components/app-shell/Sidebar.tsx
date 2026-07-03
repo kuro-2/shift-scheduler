@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Calendar,
@@ -11,6 +12,9 @@ import {
   TrendingUp,
   Settings,
   ChevronDown,
+  Package,
+  Wallet,
+  LogOut,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useUIStore } from '@/store/ui.store';
@@ -27,6 +31,9 @@ interface NavItem {
   badgeText?: string;
 }
 
+// NOTE: these tabs point at pages that currently render a "Coming soon"
+// placeholder (real implementations are commented out in each page.tsx, not
+// deleted) — only Schedule has a working page for now.
 const WORKSPACE_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, href: '/dashboard' },
   {
@@ -34,9 +41,6 @@ const WORKSPACE_ITEMS: NavItem[] = [
     label: 'Schedule',
     Icon: Calendar,
     href: '/schedule',
-    badge: 3,
-    badgeBg: 'var(--open-bg)',
-    badgeText: 'var(--open-text)',
   },
   { id: 'people', label: 'People', Icon: Users, href: '/people' },
   {
@@ -44,12 +48,11 @@ const WORKSPACE_ITEMS: NavItem[] = [
     label: 'Time off',
     Icon: CalendarOff,
     href: '/time-off',
-    badge: 4,
-    badgeBg: 'var(--pending-bg)',
-    badgeText: 'var(--pending-text)',
   },
   { id: 'attendance', label: 'Attendance', Icon: Clock, href: '/attendance' },
   { id: 'reports', label: 'Reports', Icon: TrendingUp, href: '/reports' },
+  { id: 'inventory', label: 'Inventory', Icon: Package, href: '/inventory' },
+  { id: 'financial', label: 'Financials', Icon: Wallet, href: '/financial' },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
@@ -171,6 +174,8 @@ function SidebarNavItem({
 export function Sidebar() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const pathname = usePathname();
+  const router = useRouter();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const collapsed = !sidebarOpen;
   const width = collapsed ? 60 : 236;
@@ -229,18 +234,7 @@ export function Sidebar() {
                 whiteSpace: 'nowrap',
               }}
             >
-              Cadence
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: 'var(--text-dim)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              Northgate Co.
+              Nexora
             </div>
           </div>
         )}
@@ -290,38 +284,14 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* Divider */}
-        <div
-          style={{
-            height: 1,
-            background: 'var(--border)',
-            marginInline: 4,
-            marginBlock: 4,
-          }}
-        />
-
         {/* ADMIN group */}
-        <div>
-          {!collapsed && (
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                color: 'var(--text-dim)',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                padding: '6px 10px 4px',
-              }}
-            >
-              Admin
-            </div>
-          )}
+        <div style={{ marginBottom: 4 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {ADMIN_ITEMS.map((item) => (
               <SidebarNavItem
                 key={item.id}
                 item={item}
-                isActive={pathname.startsWith(item.href)}
+                isActive={pathname.startsWith('/settings')}
                 collapsed={collapsed}
               />
             ))}
@@ -335,9 +305,63 @@ export function Sidebar() {
           borderTop: '1px solid var(--border)',
           padding: 10,
           flexShrink: 0,
+          position: 'relative',
         }}
       >
+        {userMenuOpen && (
+          <>
+            <div
+              onClick={() => setUserMenuOpen(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 60 }}
+            />
+            <div
+              role="menu"
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 10,
+                right: 10,
+                marginBottom: 6,
+                zIndex: 61,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                boxShadow: 'var(--shadow-lg)',
+                padding: 4,
+              }}
+            >
+              {/* "My profile" (Settings) hidden while the app is scoped to the scheduler only */}
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  router.push('/login');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  color: 'var(--conflict-text)',
+                  textAlign: 'left',
+                }}
+              >
+                <LogOut size={15} />
+                Log out
+              </button>
+            </div>
+          </>
+        )}
         <button
+          onClick={() => setUserMenuOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={userMenuOpen}
           style={{
             width: '100%',
             display: 'flex',
@@ -346,7 +370,7 @@ export function Sidebar() {
             padding: '6px 6px',
             borderRadius: 8,
             border: 'none',
-            background: 'transparent',
+            background: userMenuOpen ? 'var(--surface-2)' : 'transparent',
             cursor: 'pointer',
             textAlign: 'left',
             transition: 'background 0.12s ease',
@@ -355,7 +379,7 @@ export function Sidebar() {
             (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)';
           }}
           onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+            if (!userMenuOpen) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
           }}
         >
           {/* Avatar */}
